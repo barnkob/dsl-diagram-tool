@@ -10,7 +10,7 @@
    go version
    ```
 
-2. **Clone and Setup**
+2. **Setup** (git repository already initialized)
    ```bash
    cd dsl-diagram-tool
    go mod download
@@ -52,7 +52,14 @@ Each work package (WP) is a focused development effort. Before starting:
 3. Create feature branch: `git checkout -b wp##-name`
 4. Implement functionality with tests
 5. Update documentation
-6. Mark work package complete in project file
+6. Commit changes: `git commit -m "Complete WP##: description"`
+7. Mark work package complete in project file
+
+**Git Workflow:**
+- Main branch: `main` (stable, completed work packages)
+- Feature branches: `wp##-name` for each work package
+- Commit frequently with descriptive messages
+- Use conventional commit format: `feat:`, `fix:`, `docs:`, `test:`, etc.
 
 ### Running Tests
 

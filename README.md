@@ -58,8 +58,7 @@ dsl-diagram-tool/
 ### Installation
 
 ```bash
-# Clone the repository
-git clone <repository-url>
+# Navigate to the project (already initialized as git repo)
 cd dsl-diagram-tool
 
 # Install dependencies
@@ -71,6 +70,8 @@ go build -o bin/diagtool ./cmd/diagtool
 # Run tests
 go test ./...
 ```
+
+**Note:** This project is a git repository. The `.git` folder is located at the project root. GitHub Actions workflows will be functional once you push to a remote repository (e.g., GitHub).
 
 ### Building
 
