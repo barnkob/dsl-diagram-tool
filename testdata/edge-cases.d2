@@ -1,0 +1,47 @@
+# Edge Cases for Parser Testing
+
+# Special characters in quoted strings
+"node-with-dashes": Label with Dashes
+'node with spaces': Label with Spaces
+"$$price$$" -> "???status???"
+
+# Unicode and special characters
+émoji: 🚀 Rocket Service
+日本語: Japanese Node
+
+# Empty shapes
+empty: ""
+empty2: {
+  width: 50
+  height: 50
+}
+
+# Comments in various positions
+# Comment at start
+server -> database # End of line comment
+# Comment between declarations
+frontend
+# Another comment
+backend
+
+# Deep nesting
+level1: {
+  level2: {
+    level3: {
+      level4: {
+        level5: Deep Node
+      }
+    }
+  }
+}
+
+# Multiple connections between same nodes
+a -> b: Connection 1
+a -> b: Connection 2
+a <- b: Reverse
+a <-> b: Bidirectional
+
+# Reserved keywords as labels
+class: My Class
+style: My Style
+shape: My Shape

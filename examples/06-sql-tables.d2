@@ -1,0 +1,49 @@
+# Example 6: SQL Tables (ERD)
+# Demonstrates entity-relationship diagrams with SQL tables
+
+users: Users {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  email: varchar(255) {constraint: unique}
+  username: varchar(100) {constraint: unique}
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+posts: Posts {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  user_id: int {constraint: foreign_key}
+  title: varchar(500)
+  content: text
+  published: boolean
+  created_at: timestamp
+}
+
+comments: Comments {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  post_id: int {constraint: foreign_key}
+  user_id: int {constraint: foreign_key}
+  content: text
+  created_at: timestamp
+}
+
+tags: Tags {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  name: varchar(100) {constraint: unique}
+}
+
+post_tags: PostTags {
+  shape: sql_table
+  post_id: int {constraint: foreign_key}
+  tag_id: int {constraint: foreign_key}
+}
+
+# Relationships
+users.id -> posts.user_id
+users.id -> comments.user_id
+posts.id -> comments.post_id
+posts.id -> post_tags.post_id
+tags.id -> post_tags.tag_id

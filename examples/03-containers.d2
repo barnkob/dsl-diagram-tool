@@ -1,0 +1,38 @@
+# Example 3: Containers and Nesting
+# Demonstrates nested containers and cross-boundary connections
+
+aws: AWS Cloud {
+  vpc: VPC {
+    public: Public Subnet {
+      loadbalancer: Load Balancer
+      nat: NAT Gateway
+    }
+
+    private: Private Subnet {
+      webserver1: Web Server 1
+      webserver2: Web Server 2
+
+      database: Database Tier {
+        primary: Primary DB {
+          shape: cylinder
+        }
+        replica: Replica DB {
+          shape: cylinder
+        }
+      }
+    }
+  }
+}
+
+# External service
+cdn: CloudFlare CDN {
+  shape: cloud
+}
+
+# Cross-boundary connections
+cdn -> aws.vpc.public.loadbalancer: HTTPS
+aws.vpc.public.loadbalancer -> aws.vpc.private.webserver1
+aws.vpc.public.loadbalancer -> aws.vpc.private.webserver2
+aws.vpc.private.webserver1 -> aws.vpc.private.database.primary
+aws.vpc.private.webserver2 -> aws.vpc.private.database.primary
+aws.vpc.private.database.primary -> aws.vpc.private.database.replica: Replication

@@ -1,0 +1,104 @@
+# Example 7: Microservices Architecture
+# Complex real-world diagram demonstrating multiple concepts
+
+# External clients
+web: Web Clients {
+  shape: person
+}
+
+mobile: Mobile Clients {
+  shape: person
+}
+
+# API Gateway
+gateway: API Gateway {
+  style: {
+    fill: "#6366f1"
+    stroke: "#4f46e5"
+    font-color: white
+    bold: true
+  }
+}
+
+# Microservices cluster
+services: Microservices {
+  auth: Auth Service {
+    shape: hexagon
+    style.fill: "#10b981"
+  }
+
+  users: User Service {
+    shape: hexagon
+    style.fill: "#3b82f6"
+  }
+
+  orders: Order Service {
+    shape: hexagon
+    style.fill: "#f59e0b"
+  }
+
+  payments: Payment Service {
+    shape: hexagon
+    style.fill: "#ef4444"
+  }
+
+  notifications: Notification Service {
+    shape: hexagon
+    style.fill: "#8b5cf6"
+  }
+}
+
+# Data layer
+data: Data Layer {
+  userdb: User DB {
+    shape: cylinder
+  }
+
+  orderdb: Order DB {
+    shape: cylinder
+  }
+
+  cache: Redis Cache {
+    shape: circle
+  }
+}
+
+# Message queue
+queue: Message Queue {
+  shape: diamond
+  style: {
+    fill: "#ec4899"
+    font-color: white
+  }
+}
+
+# External services
+stripe: Stripe API {
+  shape: cloud
+}
+
+sendgrid: SendGrid {
+  shape: cloud
+}
+
+# Client connections
+web -> gateway: HTTPS
+mobile -> gateway: HTTPS
+
+# Gateway to services
+gateway -> services.auth: Authenticate
+gateway -> services.users: User API
+gateway -> services.orders: Order API
+
+# Service interactions
+services.orders -> services.payments: Process Payment
+services.payments -> stripe: Payment Gateway
+services.orders -> queue: Order Events
+services.notifications -> queue: Subscribe
+services.notifications -> sendgrid: Send Email
+
+# Data access
+services.users -> data.userdb
+services.orders -> data.orderdb
+services.auth -> data.cache: Session Cache
+services.users -> data.cache: User Cache

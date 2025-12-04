@@ -1,0 +1,43 @@
+# Example 4: Styled Connections
+# Demonstrates different connection types and styling
+
+client: Client App
+api: API Gateway
+auth: Auth Service
+users: User DB {
+  shape: cylinder
+}
+cache: Cache {
+  shape: circle
+}
+logs: Log Storage
+
+# Different connection types
+client -> api: REST API
+api <-> auth: Bidirectional Auth
+api -- cache: Cache Check
+api -> users: Query Users
+api -> logs: Write Logs
+
+# Styled connections
+client -> api: {
+  style: {
+    stroke: "#4CAF50"
+    stroke-width: 3
+  }
+}
+
+api -> users: {
+  style: {
+    stroke: "#2196F3"
+    stroke-width: 2
+    stroke-dash: 5
+  }
+}
+
+api -> logs: {
+  style: {
+    stroke: "#FF5722"
+    stroke-width: 1
+  }
+}

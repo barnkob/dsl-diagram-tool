@@ -1,0 +1,33 @@
+# Example 2: Different Shape Types
+# Demonstrates various shape types available in D2
+
+user: Customer {
+  shape: person
+}
+
+cloud: AWS Cloud {
+  shape: cloud
+}
+
+db: PostgreSQL {
+  shape: cylinder
+}
+
+cache: Redis {
+  shape: circle
+}
+
+storage: S3 Bucket {
+  shape: hexagon
+}
+
+process: Data Processing {
+  shape: diamond
+}
+
+# Connections between different shapes
+user -> cloud: Access
+cloud -> db: Query
+cloud -> cache: Cache Hit
+cloud -> storage: Store Files
+db -> process: ETL

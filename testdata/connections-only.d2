@@ -1,0 +1,25 @@
+# Testing various connection syntaxes
+
+# Basic connections
+a -> b
+c <- d
+e -- f
+g <-> h
+
+# Labeled connections
+i -> j: HTTP
+k <- l: Response
+m -- n: TCP
+o <-> p: WebSocket
+
+# Styled connections
+q -> r: {
+  style.stroke: red
+}
+
+s -> t: Label {
+  style: {
+    stroke: blue
+    stroke-width: 2
+  }
+}
