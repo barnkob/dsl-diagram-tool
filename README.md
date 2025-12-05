@@ -76,11 +76,16 @@ go test ./...
 ### Building
 
 ```bash
-# Development build
-go build -o bin/diagtool ./cmd/diagtool
+# Using Makefile (recommended)
+make build        # Build the binary
+make test         # Run tests
+make test-cover   # Run tests with coverage
+make verify       # Run fmt, vet, and tests
+make help         # See all available commands
 
-# Run
-./bin/diagtool
+# Or using Go directly
+go build -o bin/diagtool ./cmd/diagtool
+go test ./...
 ```
 
 ## Work Packages

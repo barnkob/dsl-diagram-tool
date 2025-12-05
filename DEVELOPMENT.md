@@ -63,6 +63,15 @@ Each work package (WP) is a focused development effort. Before starting:
 
 ### Running Tests
 
+**Using Makefile (recommended):**
+```bash
+make test         # Run all tests
+make test-v       # Run with verbose output
+make test-cover   # Run with coverage report
+make test-race    # Run with race detector
+```
+
+**Using Go directly:**
 ```bash
 # All tests
 go test ./...
@@ -80,6 +89,12 @@ go test -v ./...
 go test -bench=. ./...
 ```
 
+**Coverage report:**
+```bash
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out  # Open in browser
+```
+
 ### Code Style
 
 - Follow standard Go conventions
@@ -90,6 +105,15 @@ go test -bench=. ./...
 
 ### Building
 
+**Using Makefile (recommended):**
+```bash
+make build        # Build the binary
+make clean        # Remove build artifacts
+make run          # Build and run
+make install      # Install to GOPATH/bin
+```
+
+**Using Go directly:**
 ```bash
 # Development build
 go build -o bin/diagtool ./cmd/diagtool
@@ -99,6 +123,22 @@ GOOS=linux GOARCH=amd64 go build -o bin/diagtool-linux ./cmd/diagtool
 
 # With version info (later)
 go build -ldflags "-X main.Version=0.1.0" -o bin/diagtool ./cmd/diagtool
+```
+
+### Makefile Targets
+
+Run `make help` to see all available targets:
+```bash
+make help         # Display all available commands
+make build        # Build the CLI binary
+make test         # Run all tests
+make test-cover   # Run tests with coverage
+make fmt          # Format code
+make vet          # Run go vet
+make lint         # Run linter (requires golangci-lint)
+make verify       # Run fmt, vet, and tests
+make clean        # Remove build artifacts
+make all          # Clean, verify, and build
 ```
 
 ## Key Dependencies
