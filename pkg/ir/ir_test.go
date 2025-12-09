@@ -163,15 +163,15 @@ func TestEdge_HasArrowhead(t *testing.T) {
 
 func TestStyle_Merge(t *testing.T) {
 	base := Style{
-		Fill:       "#ff0000",
-		Stroke:     "#000000",
+		Fill:        "#ff0000",
+		Stroke:      "#000000",
 		StrokeWidth: 1,
-		Bold:       true,
+		Bold:        true,
 	}
 
 	override := Style{
-		Fill:       "#00ff00",
-		FontSize:   14,
+		Fill:     "#00ff00",
+		FontSize: 14,
 	}
 
 	result := base.Merge(override)

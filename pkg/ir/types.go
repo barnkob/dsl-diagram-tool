@@ -6,18 +6,18 @@ type ShapeType string
 // Shape types supported by the IR.
 const (
 	// Basic shapes
-	ShapeRectangle    ShapeType = "rectangle"
-	ShapeSquare       ShapeType = "square"
-	ShapeCircle       ShapeType = "circle"
-	ShapeOval         ShapeType = "oval"
-	ShapeDiamond      ShapeType = "diamond"
+	ShapeRectangle     ShapeType = "rectangle"
+	ShapeSquare        ShapeType = "square"
+	ShapeCircle        ShapeType = "circle"
+	ShapeOval          ShapeType = "oval"
+	ShapeDiamond       ShapeType = "diamond"
 	ShapeParallelogram ShapeType = "parallelogram"
-	ShapeHexagon      ShapeType = "hexagon"
+	ShapeHexagon       ShapeType = "hexagon"
 
 	// Special shapes
-	ShapePerson    ShapeType = "person"
-	ShapeCloud     ShapeType = "cloud"
-	ShapeCylinder  ShapeType = "cylinder"
+	ShapePerson   ShapeType = "person"
+	ShapeCloud    ShapeType = "cloud"
+	ShapeCylinder ShapeType = "cylinder"
 
 	// Container
 	ShapeContainer ShapeType = "container"
@@ -34,10 +34,10 @@ type Direction string
 
 // Edge directions.
 const (
-	DirectionForward     Direction = "forward"     // ->
-	DirectionBackward    Direction = "backward"    // <-
-	DirectionBoth        Direction = "both"        // <->
-	DirectionNone        Direction = "none"        // --
+	DirectionForward  Direction = "forward"  // ->
+	DirectionBackward Direction = "backward" // <-
+	DirectionBoth     Direction = "both"     // <->
+	DirectionNone     Direction = "none"     // --
 )
 
 // PositionSource indicates how a position was determined.

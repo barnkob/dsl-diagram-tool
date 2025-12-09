@@ -7,11 +7,11 @@ type Edge struct {
 	Label string `json:"label,omitempty"` // Connection label
 
 	// Connection
-	Source     string `json:"source"`                 // Source node ID
-	Target     string `json:"target"`                 // Target node ID
-	SourcePort string `json:"source_port,omitempty"`  // Connection point on source (for SQL tables, etc.)
-	TargetPort string `json:"target_port,omitempty"`  // Connection point on target
-	Direction  Direction `json:"direction"`           // Arrow direction
+	Source     string    `json:"source"`                // Source node ID
+	Target     string    `json:"target"`                // Target node ID
+	SourcePort string    `json:"source_port,omitempty"` // Connection point on source (for SQL tables, etc.)
+	TargetPort string    `json:"target_port,omitempty"` // Connection point on target
+	Direction  Direction `json:"direction"`             // Arrow direction
 
 	// Visual
 	Style Style `json:"style,omitempty"` // Visual styling
