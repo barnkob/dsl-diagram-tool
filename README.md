@@ -4,7 +4,7 @@ A hybrid diagramming tool that bridges text-based diagram creation (D2 DSL) with
 
 ## Project Status
 
-**Current Version:** 0.1.0-dev (WP03 completed)
+**Current Version:** 0.1.0-dev (WP04 completed)
 **Status:** 🏗️ Foundation & Core Parsing
 
 ## Overview
@@ -96,10 +96,10 @@ Development is organized into 31 incremental work packages across 5 phases:
 - [x] **WP01**: Project setup, repository, dependencies ✅
 - [x] **WP02**: D2 syntax research and example collection ✅
 - [x] **WP03**: Internal Representation design ✅
-- [ ] **WP04**: D2 integration and wrapping
-- [ ] **WP05**: Parser implementation
-- [ ] **WP06**: IR builder
-- [ ] **WP07**: Parser test suite
+- [x] **WP04**: D2 integration and D2→IR converter ✅
+- [ ] **WP05**: Parser refinements (if needed)
+- [ ] **WP06**: IR validation enhancements (if needed)
+- [ ] **WP07**: Parser test suite expansion
 
 ### Phase 2: Layout Engine (WP08-13)
 ### Phase 3: Rendering Engine (WP14-19)
@@ -144,4 +144,4 @@ To be determined
 
 ---
 
-**Last Updated:** 2025-12-09 (WP03 completed)
+**Last Updated:** 2025-12-09 (WP04 completed)
