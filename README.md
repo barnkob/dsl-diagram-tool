@@ -4,8 +4,8 @@ A hybrid diagramming tool that bridges text-based diagram creation (D2 DSL) with
 
 ## Project Status
 
-**Current Version:** 0.1.0-dev (WP04 completed)
-**Status:** 🏗️ Foundation & Core Parsing
+**Current Version:** 0.1.0-dev (WP08 completed)
+**Status:** 🏗️ Layout Engine Implementation
 
 ## Overview
 
@@ -102,6 +102,7 @@ Development is organized into 31 incremental work packages across 5 phases:
 - [ ] **WP07**: Parser test suite expansion
 
 ### Phase 2: Layout Engine (WP08-13)
+- [x] **WP08**: Layout engine integration (Dagre) ✅
 ### Phase 3: Rendering Engine (WP14-19)
 ### Phase 4: CLI Tool (WP20-26)
 ### Phase 5: Metadata Layer (WP27-31)
