@@ -4,8 +4,8 @@ A hybrid diagramming tool that bridges text-based diagram creation (D2 DSL) with
 
 ## Project Status
 
-**Current Version:** 0.1.0-dev (WP14 completed)
-**Status:** 🏗️ Rendering Engine Complete
+**Current Version:** 0.1.0-dev (WP20 completed)
+**Status:** 🚀 CLI Tool Ready
 
 ## Overview
 
@@ -28,7 +28,7 @@ D2 File → Parser (D2 lib) → Internal Representation → Layout Engine → Re
 
 - **Language:** Go 1.21+
 - **D2 Library:** oss.terrastruct.com/d2 (v0.7.1)
-- **CLI Framework:** To be added (cobra - WP20)
+- **CLI Framework:** cobra (v1.10.2)
 - **Layout Engines:** D2's Dagre, ELK, TALA
 - **Output Formats:** SVG, PNG, PDF
 
@@ -73,6 +73,46 @@ go test ./...
 
 **Note:** This project is a git repository. The `.git` folder is located at the project root. GitHub Actions workflows will be functional once you push to a remote repository (e.g., GitHub).
 
+## Usage
+
+### Render a D2 diagram to SVG
+
+```bash
+# Basic rendering
+diagtool render diagram.d2
+
+# Specify output file
+diagtool render diagram.d2 -o output.svg
+
+# Use sketch (hand-drawn) style
+diagtool render diagram.d2 --sketch
+
+# Use dark mode
+diagtool render diagram.d2 --dark
+
+# Use a specific theme (0-8)
+diagtool render diagram.d2 --theme 3
+
+# Custom padding
+diagtool render diagram.d2 --padding 50
+```
+
+### Validate a D2 file
+
+```bash
+# Basic validation
+diagtool validate diagram.d2
+
+# Verbose output
+diagtool validate diagram.d2 -v
+```
+
+### Show version
+
+```bash
+diagtool version
+```
+
 ### Building
 
 ```bash
@@ -110,6 +150,9 @@ Development is organized into 31 incremental work packages across 5 phases:
 - [ ] **WP19**: Rendering test suite expansion
 
 ### Phase 4: CLI Tool (WP20-26)
+- [x] **WP20**: CLI design and implementation with cobra ✅
+- [ ] **WP21-26**: Additional CLI features (watch mode, PNG/PDF export)
+
 ### Phase 5: Metadata Layer (WP27-31)
 
 See [project documentation](../Projects/DSL-Diagram-Tool.md) for complete work package breakdown.
@@ -150,4 +193,4 @@ To be determined
 
 ---
 
-**Last Updated:** 2025-12-09 (WP14 completed)
+**Last Updated:** 2025-12-10 (WP20 completed)

@@ -1,0 +1,127 @@
+package cmd
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/spf13/cobra"
+
+	"github.com/mark/dsl-diagram-tool/pkg/render"
+)
+
+var (
+	outputFile   string
+	outputFormat string
+	themeID      int64
+	darkMode     bool
+	sketchMode   bool
+	padding      int64
+	noCenter     bool
+)
+
+var renderCmd = &cobra.Command{
+	Use:   "render <input.d2>",
+	Short: "Render a D2 diagram to SVG, PNG, or PDF",
+	Long: `Render a D2 diagram file to the specified output format.
+
+Supported output formats:
+  - svg (default): Scalable Vector Graphics
+  - png: Portable Network Graphics (requires additional setup)
+  - pdf: Portable Document Format (requires additional setup)
+
+The output filename is derived from the input filename if not specified.
+For example, 'diagram.d2' will produce 'diagram.svg' by default.
+
+Examples:
+  # Render to SVG (default)
+  diagtool render diagram.d2
+
+  # Specify output file
+  diagtool render diagram.d2 -o output.svg
+
+  # Use dark theme
+  diagtool render diagram.d2 --dark
+
+  # Use sketch/hand-drawn style
+  diagtool render diagram.d2 --sketch
+
+  # Use a specific theme (0-8)
+  diagtool render diagram.d2 --theme 3`,
+	Args: cobra.ExactArgs(1),
+	RunE: runRender,
+}
+
+func init() {
+	renderCmd.Flags().StringVarP(&outputFile, "output", "o", "", "Output file path (default: input name with format extension)")
+	renderCmd.Flags().StringVarP(&outputFormat, "format", "f", "svg", "Output format: svg, png, pdf")
+	renderCmd.Flags().Int64VarP(&themeID, "theme", "t", 0, "Theme ID (0-8, default: 0)")
+	renderCmd.Flags().BoolVarP(&darkMode, "dark", "d", false, "Use dark mode theme")
+	renderCmd.Flags().BoolVarP(&sketchMode, "sketch", "s", false, "Use sketch/hand-drawn style")
+	renderCmd.Flags().Int64VarP(&padding, "padding", "p", 100, "Padding around diagram in pixels")
+	renderCmd.Flags().BoolVar(&noCenter, "no-center", false, "Don't center the diagram")
+}
+
+func runRender(cmd *cobra.Command, args []string) error {
+	inputFile := args[0]
+
+	// Read input file
+	content, err := os.ReadFile(inputFile)
+	if err != nil {
+		return fmt.Errorf("failed to read input file: %w", err)
+	}
+
+	// Determine output format
+	format := strings.ToLower(outputFormat)
+	switch format {
+	case "svg", "png", "pdf":
+		// Valid format
+	default:
+		return fmt.Errorf("unsupported output format: %s (use svg, png, or pdf)", format)
+	}
+
+	// Determine output file path
+	outPath := outputFile
+	if outPath == "" {
+		// Derive from input filename
+		base := strings.TrimSuffix(filepath.Base(inputFile), filepath.Ext(inputFile))
+		outPath = base + "." + format
+	}
+
+	// Create render options
+	opts := render.Options{
+		Format:   render.Format(format),
+		ThemeID:  themeID,
+		DarkMode: darkMode,
+		Sketch:   sketchMode,
+		Padding:  padding,
+		Center:   !noCenter,
+		Scale:    1.0,
+	}
+
+	// Render the diagram
+	ctx := context.Background()
+	var output []byte
+
+	switch format {
+	case "svg":
+		output, err = render.RenderFromSource(ctx, string(content), opts)
+		if err != nil {
+			return fmt.Errorf("rendering failed: %w", err)
+		}
+	case "png", "pdf":
+		// For now, only SVG is fully supported
+		// PNG and PDF require additional dependencies (resvg, cairo, etc.)
+		return fmt.Errorf("%s export is not yet implemented (use svg for now)", format)
+	}
+
+	// Write output file
+	if err := os.WriteFile(outPath, output, 0644); err != nil {
+		return fmt.Errorf("failed to write output file: %w", err)
+	}
+
+	fmt.Printf("Rendered %s → %s (%d bytes)\n", inputFile, outPath, len(output))
+	return nil
+}
