@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -20,6 +21,7 @@ func newTestRootCmd() *cobra.Command {
 	padding = 100
 	noCenter = false
 	verbose = false
+	watchMode = false
 
 	// Create fresh commands
 	testRoot := &cobra.Command{
@@ -316,5 +318,174 @@ func TestValidateCommand_ExampleFiles(t *testing.T) {
 				t.Fatalf("Validate failed for %s: %v", file, err)
 			}
 		})
+	}
+}
+
+// Watch mode tests
+
+func TestResolveRenderConfig_DefaultOutput(t *testing.T) {
+	// Reset global flags
+	outputFile = ""
+	outputFormat = "svg"
+
+	cfg, err := resolveRenderConfig("diagram.d2")
+	if err != nil {
+		t.Fatalf("resolveRenderConfig failed: %v", err)
+	}
+
+	if cfg.outPath != "diagram.svg" {
+		t.Errorf("Expected output path 'diagram.svg', got '%s'", cfg.outPath)
+	}
+	if cfg.format != "svg" {
+		t.Errorf("Expected format 'svg', got '%s'", cfg.format)
+	}
+}
+
+func TestResolveRenderConfig_AutoDetectPNG(t *testing.T) {
+	// Reset global flags
+	outputFile = "output.png"
+	outputFormat = "svg" // Default, but should be overridden
+
+	cfg, err := resolveRenderConfig("diagram.d2")
+	if err != nil {
+		t.Fatalf("resolveRenderConfig failed: %v", err)
+	}
+
+	if cfg.format != "png" {
+		t.Errorf("Expected format 'png' (auto-detected), got '%s'", cfg.format)
+	}
+	if cfg.outPath != "output.png" {
+		t.Errorf("Expected output path 'output.png', got '%s'", cfg.outPath)
+	}
+}
+
+func TestResolveRenderConfig_ExplicitFormat(t *testing.T) {
+	// Reset global flags
+	outputFile = ""
+	outputFormat = "png"
+
+	cfg, err := resolveRenderConfig("test.d2")
+	if err != nil {
+		t.Fatalf("resolveRenderConfig failed: %v", err)
+	}
+
+	if cfg.format != "png" {
+		t.Errorf("Expected format 'png', got '%s'", cfg.format)
+	}
+	if cfg.outPath != "test.png" {
+		t.Errorf("Expected output path 'test.png', got '%s'", cfg.outPath)
+	}
+}
+
+func TestResolveRenderConfig_InvalidFormat(t *testing.T) {
+	outputFile = ""
+	outputFormat = "invalid"
+
+	_, err := resolveRenderConfig("test.d2")
+	if err == nil {
+		t.Error("Expected error for invalid format")
+	}
+	if !strings.Contains(err.Error(), "unsupported output format") {
+		t.Errorf("Expected 'unsupported output format' error, got: %v", err)
+	}
+}
+
+func TestDoRender_SVG(t *testing.T) {
+	tmpDir := t.TempDir()
+	inputFile := filepath.Join(tmpDir, "test.d2")
+	outputPath := filepath.Join(tmpDir, "test.svg")
+
+	os.WriteFile(inputFile, []byte("a -> b"), 0644)
+
+	// Reset flags and create config manually
+	outputFile = outputPath
+	outputFormat = "svg"
+	themeID = 0
+	darkMode = false
+	sketchMode = false
+	padding = 100
+	noCenter = false
+
+	cfg, err := resolveRenderConfig(inputFile)
+	if err != nil {
+		t.Fatalf("resolveRenderConfig failed: %v", err)
+	}
+
+	err = doRender(cfg)
+	if err != nil {
+		t.Fatalf("doRender failed: %v", err)
+	}
+
+	// Check output exists
+	content, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("Failed to read output: %v", err)
+	}
+	if !strings.Contains(string(content), "<svg") {
+		t.Error("Output should contain SVG markup")
+	}
+}
+
+func TestDoRender_FileNotFound(t *testing.T) {
+	outputFile = ""
+	outputFormat = "svg"
+
+	cfg := &renderConfig{
+		inputFile: "nonexistent.d2",
+		outPath:   "output.svg",
+		format:    "svg",
+	}
+
+	err := doRender(cfg)
+	if err == nil {
+		t.Error("Expected error for nonexistent file")
+	}
+	if !strings.Contains(err.Error(), "failed to read") {
+		t.Errorf("Expected 'failed to read' error, got: %v", err)
+	}
+}
+
+func TestDoRender_InvalidD2Syntax(t *testing.T) {
+	tmpDir := t.TempDir()
+	inputFile := filepath.Join(tmpDir, "invalid.d2")
+	outputPath := filepath.Join(tmpDir, "invalid.svg")
+
+	os.WriteFile(inputFile, []byte("a -> -> b"), 0644)
+
+	cfg := &renderConfig{
+		inputFile: inputFile,
+		outPath:   outputPath,
+		format:    "svg",
+	}
+
+	err := doRender(cfg)
+	if err == nil {
+		t.Error("Expected error for invalid D2 syntax")
+	}
+}
+
+func TestFormatTime(t *testing.T) {
+	ts := formatTime()
+
+	// Should be in HH:MM:SS format
+	if len(ts) != 8 {
+		t.Errorf("Expected timestamp length 8, got %d (%s)", len(ts), ts)
+	}
+
+	// Should parse as time
+	_, err := time.Parse("15:04:05", ts)
+	if err != nil {
+		t.Errorf("formatTime returned invalid time format: %v", err)
+	}
+}
+
+func TestWatchFlag_Recognized(t *testing.T) {
+	// Verify the watch flag is properly defined
+	flag := renderCmd.Flags().Lookup("watch")
+	if flag == nil {
+		t.Fatal("watch flag not found")
+	}
+	if flag.Shorthand != "w" {
+		t.Errorf("Expected shorthand 'w', got '%s'", flag.Shorthand)
 	}
 }

@@ -4,8 +4,8 @@ A hybrid diagramming tool that bridges text-based diagram creation (D2 DSL) with
 
 ## Project Status
 
-**Current Version:** 0.1.0-dev (WP23 completed)
-**Status:** 🚀 CLI Tool with PNG Export
+**Current Version:** 0.1.0-dev (WP25 completed)
+**Status:** 🚀 CLI Tool with PNG Export & Watch Mode
 
 ## Overview
 
@@ -101,9 +101,16 @@ diagtool render diagram.d2 --theme 3
 
 # Custom padding
 diagtool render diagram.d2 --padding 50
+
+# Watch mode: auto-regenerate on file changes
+diagtool render diagram.d2 --watch
+diagtool render diagram.d2 -w -o output.png
 ```
 
 **Tip:** The output format is automatically detected from the file extension (`.png`, `.svg`, `.pdf`). Use `-f` to explicitly override.
+
+**Watch Mode:**
+Use `--watch` or `-w` to monitor the input file for changes and automatically re-render. This is useful during diagram development - edit your `.d2` file in your editor and see the output update in real-time. Watch mode displays timestamps and gracefully handles syntax errors without crashing.
 
 **PNG Export:**
 PNG export uses [resvg](https://github.com/RazrFalcon/resvg) (via WebAssembly) for high-quality SVG to PNG conversion. No external dependencies required - it's built right into the binary!
@@ -163,7 +170,9 @@ Development is organized into 31 incremental work packages across 5 phases:
 ### Phase 4: CLI Tool (WP20-26)
 - [x] **WP20**: CLI design and implementation with cobra ✅
 - [x] **WP23**: PNG Export ✅
-- [ ] **WP24-26**: Additional CLI features (PDF export, watch mode)
+- [x] **WP25**: Watch Mode ✅
+- [ ] **WP24**: PDF Export (deferred)
+- [ ] **WP26**: CLI test suite expansion
 
 ### Phase 5: Metadata Layer (WP27-31)
 
@@ -205,4 +214,4 @@ To be determined
 
 ---
 
-**Last Updated:** 2025-12-10 (WP20 completed)
+**Last Updated:** 2025-12-12 (WP25 completed)

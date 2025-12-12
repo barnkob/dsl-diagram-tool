@@ -4,9 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/cobra"
 
 	"github.com/mark/dsl-diagram-tool/pkg/parser"
@@ -21,6 +25,7 @@ var (
 	sketchMode   bool
 	padding      int64
 	noCenter     bool
+	watchMode    bool
 )
 
 var renderCmd = &cobra.Command{
@@ -60,6 +65,10 @@ Examples:
   # Use a specific theme (0-8)
   diagtool render diagram.d2 --theme 3
 
+  # Watch mode: auto-regenerate on file changes
+  diagtool render diagram.d2 --watch
+  diagtool render diagram.d2 -w -o output.png
+
 Note: Format is auto-detected from output file extension (.png, .svg, .pdf).
 Use -f to explicitly override the format.`,
 	Args: cobra.ExactArgs(1),
@@ -74,23 +83,21 @@ func init() {
 	renderCmd.Flags().BoolVarP(&sketchMode, "sketch", "s", false, "Use sketch/hand-drawn style")
 	renderCmd.Flags().Int64VarP(&padding, "padding", "p", 100, "Padding around diagram in pixels")
 	renderCmd.Flags().BoolVar(&noCenter, "no-center", false, "Don't center the diagram")
+	renderCmd.Flags().BoolVarP(&watchMode, "watch", "w", false, "Watch input file for changes and auto-regenerate")
 }
 
-func runRender(cmd *cobra.Command, args []string) error {
-	inputFile := args[0]
+// renderConfig holds the resolved configuration for rendering
+type renderConfig struct {
+	inputFile string
+	outPath   string
+	format    string
+	opts      render.Options
+}
 
-	// Read input file
-	content, err := os.ReadFile(inputFile)
-	if err != nil {
-		return fmt.Errorf("failed to read input file: %w", err)
-	}
-
+// resolveRenderConfig determines output path and format from flags and input file
+func resolveRenderConfig(inputFile string) (*renderConfig, error) {
 	// Determine output file path first (to potentially auto-detect format)
 	outPath := outputFile
-	if outPath == "" {
-		// Will derive after we know the format
-		outPath = ""
-	}
 
 	// Determine output format
 	// Auto-detect from output file extension if -f not specified
@@ -108,7 +115,7 @@ func runRender(cmd *cobra.Command, args []string) error {
 	case "svg", "png", "pdf":
 		// Valid format
 	default:
-		return fmt.Errorf("unsupported output format: %s (use svg, png, or pdf)", format)
+		return nil, fmt.Errorf("unsupported output format: %s (use svg, png, or pdf)", format)
 	}
 
 	// Derive output path if not specified
@@ -128,13 +135,28 @@ func runRender(cmd *cobra.Command, args []string) error {
 		Scale:    1.0,
 	}
 
-	// Render the diagram
+	return &renderConfig{
+		inputFile: inputFile,
+		outPath:   outPath,
+		format:    format,
+		opts:      opts,
+	}, nil
+}
+
+// doRender performs a single render operation
+func doRender(cfg *renderConfig) error {
+	// Read input file
+	content, err := os.ReadFile(cfg.inputFile)
+	if err != nil {
+		return fmt.Errorf("failed to read input file: %w", err)
+	}
+
 	ctx := context.Background()
 	var output []byte
 
-	switch format {
+	switch cfg.format {
 	case "svg":
-		output, err = render.RenderFromSource(ctx, string(content), opts)
+		output, err = render.RenderFromSource(ctx, string(content), cfg.opts)
 		if err != nil {
 			return fmt.Errorf("rendering failed: %w", err)
 		}
@@ -147,7 +169,7 @@ func runRender(cmd *cobra.Command, args []string) error {
 		}
 
 		// Create PNG renderer
-		pngRenderer, err := render.NewPNGRendererWithOptions(opts)
+		pngRenderer, err := render.NewPNGRendererWithOptions(cfg.opts)
 		if err != nil {
 			return fmt.Errorf("failed to initialize PNG renderer: %w", err)
 		}
@@ -159,15 +181,121 @@ func runRender(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("PNG rendering failed: %w", err)
 		}
 	case "pdf":
-		// PDF export not yet implemented
 		return fmt.Errorf("PDF export is not yet implemented (use svg or png for now)")
 	}
 
 	// Write output file
-	if err := os.WriteFile(outPath, output, 0644); err != nil {
+	if err := os.WriteFile(cfg.outPath, output, 0644); err != nil {
 		return fmt.Errorf("failed to write output file: %w", err)
 	}
 
-	fmt.Printf("Rendered %s → %s (%d bytes)\n", inputFile, outPath, len(output))
 	return nil
+}
+
+func runRender(cmd *cobra.Command, args []string) error {
+	inputFile := args[0]
+
+	// Resolve configuration
+	cfg, err := resolveRenderConfig(inputFile)
+	if err != nil {
+		return err
+	}
+
+	// Single render mode
+	if !watchMode {
+		if err := doRender(cfg); err != nil {
+			return err
+		}
+		fmt.Printf("Rendered %s → %s\n", cfg.inputFile, cfg.outPath)
+		return nil
+	}
+
+	// Watch mode
+	return runWatchMode(cfg)
+}
+
+// runWatchMode watches the input file and re-renders on changes
+func runWatchMode(cfg *renderConfig) error {
+	// Get absolute path for reliable watching
+	absPath, err := filepath.Abs(cfg.inputFile)
+	if err != nil {
+		return fmt.Errorf("failed to resolve input path: %w", err)
+	}
+
+	// Create watcher
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return fmt.Errorf("failed to create file watcher: %w", err)
+	}
+	defer watcher.Close()
+
+	// Watch the directory containing the file (more reliable for editor saves)
+	dir := filepath.Dir(absPath)
+	if err := watcher.Add(dir); err != nil {
+		return fmt.Errorf("failed to watch directory: %w", err)
+	}
+
+	// Setup signal handling for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	// Do initial render
+	fmt.Printf("Watching %s for changes (Ctrl+C to stop)...\n", cfg.inputFile)
+	if err := doRender(cfg); err != nil {
+		fmt.Printf("[%s] Error: %v\n", formatTime(), err)
+	} else {
+		fmt.Printf("[%s] Rendered %s → %s\n", formatTime(), cfg.inputFile, cfg.outPath)
+	}
+
+	// Debounce timer to avoid multiple renders for rapid changes
+	var debounceTimer *time.Timer
+	const debounceDelay = 100 * time.Millisecond
+
+	baseName := filepath.Base(absPath)
+
+	for {
+		select {
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return nil
+			}
+
+			// Only react to changes to our specific file
+			if filepath.Base(event.Name) != baseName {
+				continue
+			}
+
+			// Only react to write/create events (editors may delete+create)
+			if !event.Has(fsnotify.Write) && !event.Has(fsnotify.Create) {
+				continue
+			}
+
+			// Debounce: reset timer on each event
+			if debounceTimer != nil {
+				debounceTimer.Stop()
+			}
+			debounceTimer = time.AfterFunc(debounceDelay, func() {
+				if err := doRender(cfg); err != nil {
+					fmt.Printf("[%s] Error: %v\n", formatTime(), err)
+				} else {
+					fmt.Printf("[%s] Rendered %s → %s\n", formatTime(), cfg.inputFile, cfg.outPath)
+				}
+			})
+
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return nil
+			}
+			fmt.Printf("[%s] Watch error: %v\n", formatTime(), err)
+
+		case <-sigChan:
+			fmt.Printf("\nStopping watch mode.\n")
+			return nil
+		}
+	}
+}
+
+// formatTime returns a formatted timestamp for watch mode output
+func formatTime() string {
+	return time.Now().Format("15:04:05")
 }
