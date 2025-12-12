@@ -12,6 +12,7 @@ import (
 	"oss.terrastruct.com/d2/d2layouts/d2dagrelayout"
 	"oss.terrastruct.com/d2/d2lib"
 	"oss.terrastruct.com/d2/d2renderers/d2svg"
+	"oss.terrastruct.com/d2/lib/png"
 	"oss.terrastruct.com/d2/lib/textmeasure"
 
 	"github.com/mark/dsl-diagram-tool/pkg/ir"
@@ -95,6 +96,93 @@ func NewSVGRenderer() *SVGRenderer {
 func NewSVGRendererWithOptions(opts Options) *SVGRenderer {
 	opts.Format = FormatSVG
 	return &SVGRenderer{Options: opts}
+}
+
+// PNGRenderer renders diagrams to PNG format using D2's rendering pipeline.
+// This uses playwright under the hood to convert SVG to PNG.
+type PNGRenderer struct {
+	Options    Options
+	playwright png.Playwright
+}
+
+// NewPNGRenderer creates a new PNG renderer with default options.
+// Initializes playwright for SVG to PNG conversion.
+func NewPNGRenderer() (*PNGRenderer, error) {
+	opts := DefaultOptions()
+	opts.Format = FormatPNG
+
+	pw, err := png.InitPlaywright()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize playwright: %w", err)
+	}
+
+	return &PNGRenderer{
+		Options:    opts,
+		playwright: pw,
+	}, nil
+}
+
+// NewPNGRendererWithOptions creates a new PNG renderer with custom options.
+func NewPNGRendererWithOptions(opts Options) (*PNGRenderer, error) {
+	opts.Format = FormatPNG
+
+	pw, err := png.InitPlaywright()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize playwright: %w", err)
+	}
+
+	return &PNGRenderer{
+		Options:    opts,
+		playwright: pw,
+	}, nil
+}
+
+// Close releases playwright resources. Should be called when done rendering.
+func (r *PNGRenderer) Close() error {
+	if r.playwright.Browser != nil {
+		return r.playwright.Browser.Close()
+	}
+	return nil
+}
+
+// Render renders the diagram to PNG format.
+func (r *PNGRenderer) Render(ctx context.Context, diagram *ir.Diagram, w io.Writer) error {
+	pngBytes, err := r.RenderToBytes(ctx, diagram)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(pngBytes)
+	return err
+}
+
+// RenderToBytes renders the diagram and returns PNG as bytes.
+func (r *PNGRenderer) RenderToBytes(ctx context.Context, diagram *ir.Diagram) ([]byte, error) {
+	// First render to SVG
+	svgRenderer := NewSVGRendererWithOptions(r.Options)
+	svgBytes, err := svgRenderer.RenderToBytes(ctx, diagram)
+	if err != nil {
+		return nil, fmt.Errorf("failed to render SVG for PNG conversion: %w", err)
+	}
+
+	// Convert SVG to PNG using playwright
+	page, err := r.playwright.Browser.NewPage()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create browser page: %w", err)
+	}
+	defer page.Close()
+
+	pngBytes, err := png.ConvertSVG(page, svgBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert SVG to PNG: %w", err)
+	}
+
+	// Add EXIF metadata
+	pngBytes, err = png.AddExif(pngBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to add EXIF metadata: %w", err)
+	}
+
+	return pngBytes, nil
 }
 
 // Render renders the diagram to SVG format.

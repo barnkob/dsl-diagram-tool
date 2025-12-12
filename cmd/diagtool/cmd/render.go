@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mark/dsl-diagram-tool/pkg/parser"
 	"github.com/mark/dsl-diagram-tool/pkg/render"
 )
 
@@ -29,8 +30,11 @@ var renderCmd = &cobra.Command{
 
 Supported output formats:
   - svg (default): Scalable Vector Graphics
-  - png: Portable Network Graphics (requires additional setup)
-  - pdf: Portable Document Format (requires additional setup)
+  - png: Portable Network Graphics (requires playwright browsers)
+  - pdf: Portable Document Format (not yet implemented)
+
+PNG export requires playwright browsers to be installed:
+  playwright install chromium
 
 The output filename is derived from the input filename if not specified.
 For example, 'diagram.d2' will produce 'diagram.svg' by default.
@@ -38,6 +42,9 @@ For example, 'diagram.d2' will produce 'diagram.svg' by default.
 Examples:
   # Render to SVG (default)
   diagtool render diagram.d2
+
+  # Render to PNG
+  diagtool render diagram.d2 -f png
 
   # Specify output file
   diagtool render diagram.d2 -o output.svg
@@ -111,10 +118,29 @@ func runRender(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("rendering failed: %w", err)
 		}
-	case "png", "pdf":
-		// For now, only SVG is fully supported
-		// PNG and PDF require additional dependencies (resvg, cairo, etc.)
-		return fmt.Errorf("%s export is not yet implemented (use svg for now)", format)
+	case "png":
+		// Parse D2 to IR
+		p := parser.NewD2Parser()
+		diagram, err := p.Parse(string(content))
+		if err != nil {
+			return fmt.Errorf("parsing failed: %w", err)
+		}
+
+		// Create PNG renderer
+		pngRenderer, err := render.NewPNGRendererWithOptions(opts)
+		if err != nil {
+			return fmt.Errorf("failed to initialize PNG renderer: %w", err)
+		}
+		defer pngRenderer.Close()
+
+		// Render to PNG
+		output, err = pngRenderer.RenderToBytes(ctx, diagram)
+		if err != nil {
+			return fmt.Errorf("PNG rendering failed: %w", err)
+		}
+	case "pdf":
+		// PDF export not yet implemented
+		return fmt.Errorf("PDF export is not yet implemented (use svg or png for now)")
 	}
 
 	// Write output file

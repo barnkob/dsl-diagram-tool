@@ -4,8 +4,8 @@ A hybrid diagramming tool that bridges text-based diagram creation (D2 DSL) with
 
 ## Project Status
 
-**Current Version:** 0.1.0-dev (WP20 completed)
-**Status:** 🚀 CLI Tool Ready
+**Current Version:** 0.1.0-dev (WP23 completed)
+**Status:** 🚀 CLI Tool with PNG Export
 
 ## Overview
 
@@ -75,11 +75,14 @@ go test ./...
 
 ## Usage
 
-### Render a D2 diagram to SVG
+### Render a D2 diagram to SVG or PNG
 
 ```bash
-# Basic rendering
+# Basic rendering (SVG)
 diagtool render diagram.d2
+
+# Render to PNG (requires playwright browsers)
+diagtool render diagram.d2 -f png
 
 # Specify output file
 diagtool render diagram.d2 -o output.svg
@@ -95,6 +98,14 @@ diagtool render diagram.d2 --theme 3
 
 # Custom padding
 diagtool render diagram.d2 --padding 50
+```
+
+**PNG Export Requirements:**
+PNG export uses playwright to convert SVG to high-quality PNG. You need to install chromium:
+
+```bash
+# Install playwright browsers (one-time setup)
+go run github.com/playwright-community/playwright-go/cmd/playwright@latest install chromium
 ```
 
 ### Validate a D2 file
@@ -151,7 +162,8 @@ Development is organized into 31 incremental work packages across 5 phases:
 
 ### Phase 4: CLI Tool (WP20-26)
 - [x] **WP20**: CLI design and implementation with cobra ✅
-- [ ] **WP21-26**: Additional CLI features (watch mode, PNG/PDF export)
+- [x] **WP23**: PNG Export ✅
+- [ ] **WP24-26**: Additional CLI features (PDF export, watch mode)
 
 ### Phase 5: Metadata Layer (WP27-31)
 

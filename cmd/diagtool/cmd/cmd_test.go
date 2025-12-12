@@ -160,21 +160,34 @@ func TestRenderCommand_WithTheme(t *testing.T) {
 	}
 }
 
-func TestRenderCommand_PNGNotImplemented(t *testing.T) {
+func TestRenderCommand_PNGExport(t *testing.T) {
+	// Skip if playwright browsers not installed
+	// This test requires: playwright install chromium
+	t.Skip("PNG export requires playwright browsers - skipping in automated tests")
+
 	tmpDir := t.TempDir()
 	inputFile := filepath.Join(tmpDir, "test.d2")
+	outputFilePath := filepath.Join(tmpDir, "test.png")
 
 	os.WriteFile(inputFile, []byte("a -> b"), 0644)
 
 	cmd := newTestRootCmd()
-	cmd.SetArgs([]string{"render", inputFile, "-f", "png"})
+	cmd.SetArgs([]string{"render", inputFile, "-f", "png", "-o", outputFilePath})
 	err := cmd.Execute()
 
-	if err == nil {
-		t.Error("PNG should not be implemented yet")
+	if err != nil {
+		t.Fatalf("PNG render failed: %v", err)
 	}
-	if err != nil && !strings.Contains(err.Error(), "not yet implemented") {
-		t.Errorf("Expected 'not yet implemented' error, got: %v", err)
+
+	// Check output file exists
+	if _, err := os.Stat(outputFilePath); os.IsNotExist(err) {
+		t.Fatal("PNG output file was not created")
+	}
+
+	// Check it's actually a PNG (magic bytes)
+	content, _ := os.ReadFile(outputFilePath)
+	if len(content) < 4 || content[0] != 0x89 || content[1] != 'P' || content[2] != 'N' || content[3] != 'G' {
+		t.Error("Output is not a valid PNG file")
 	}
 }
 

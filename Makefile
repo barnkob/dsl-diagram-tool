@@ -10,11 +10,17 @@ help:
 	@grep -E '^##' Makefile | sed 's/^## /  /'
 	@echo ""
 
-## build: Build the CLI binary
+## build: Build the CLI binary (optimized, stripped)
 build:
 	@echo "Building diagtool..."
+	@go build -ldflags="-s -w" -trimpath -o bin/diagtool ./cmd/diagtool
+	@echo "✓ Built bin/diagtool (optimized)"
+
+## build-dev: Build with debug symbols for development
+build-dev:
+	@echo "Building diagtool (with debug symbols)..."
 	@go build -o bin/diagtool ./cmd/diagtool
-	@echo "✓ Built bin/diagtool"
+	@echo "✓ Built bin/diagtool (dev)"
 
 ## install: Install the binary to GOPATH/bin
 install:
