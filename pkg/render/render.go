@@ -7,12 +7,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 
 	resvg "github.com/kanrichan/resvg-go"
 	"oss.terrastruct.com/d2/d2graph"
 	"oss.terrastruct.com/d2/d2layouts/d2dagrelayout"
 	"oss.terrastruct.com/d2/d2lib"
 	"oss.terrastruct.com/d2/d2renderers/d2svg"
+	"oss.terrastruct.com/d2/lib/log"
 	"oss.terrastruct.com/d2/lib/textmeasure"
 
 	"github.com/mark/dsl-diagram-tool/pkg/ir"
@@ -187,6 +189,11 @@ func (r *SVGRenderer) Render(ctx context.Context, diagram *ir.Diagram, w io.Writ
 
 // RenderToBytes renders the diagram and returns SVG as bytes.
 func (r *SVGRenderer) RenderToBytes(ctx context.Context, diagram *ir.Diagram) ([]byte, error) {
+	// Add a discarding logger to context to suppress D2 warnings
+	// D2 logs to stderr by default, which clutters the output
+	discardLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	ctx = log.With(ctx, discardLogger)
+
 	// Convert IR to D2 source
 	d2Source := irToD2Source(diagram)
 
@@ -240,6 +247,10 @@ func (r *SVGRenderer) RenderToBytes(ctx context.Context, diagram *ir.Diagram) ([
 // RenderFromSource renders D2 source directly to SVG.
 // This is more efficient when you have the original D2 source.
 func RenderFromSource(ctx context.Context, source string, opts Options) ([]byte, error) {
+	// Add a discarding logger to context to suppress D2 warnings
+	discardLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	ctx = log.With(ctx, discardLogger)
+
 	// Create text ruler for measurement
 	ruler, err := textmeasure.NewRuler()
 	if err != nil {
