@@ -81,7 +81,10 @@ go test ./...
 # Basic rendering (SVG)
 diagtool render diagram.d2
 
-# Render to PNG (no setup required!)
+# Render to PNG (format auto-detected from extension)
+diagtool render diagram.d2 -o diagram.png
+
+# Render to PNG (explicit format)
 diagtool render diagram.d2 -f png
 
 # Specify output file
@@ -99,6 +102,8 @@ diagtool render diagram.d2 --theme 3
 # Custom padding
 diagtool render diagram.d2 --padding 50
 ```
+
+**Tip:** The output format is automatically detected from the file extension (`.png`, `.svg`, `.pdf`). Use `-f` to explicitly override.
 
 **PNG Export:**
 PNG export uses [resvg](https://github.com/RazrFalcon/resvg) (via WebAssembly) for high-quality SVG to PNG conversion. No external dependencies required - it's built right into the binary!

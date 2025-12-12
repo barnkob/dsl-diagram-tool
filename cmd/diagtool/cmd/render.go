@@ -42,7 +42,10 @@ Examples:
   # Render to SVG (default)
   diagtool render diagram.d2
 
-  # Render to PNG
+  # Render to PNG (auto-detected from extension)
+  diagtool render diagram.d2 -o diagram.png
+
+  # Render to PNG (explicit format)
   diagtool render diagram.d2 -f png
 
   # Specify output file
@@ -55,7 +58,10 @@ Examples:
   diagtool render diagram.d2 --sketch
 
   # Use a specific theme (0-8)
-  diagtool render diagram.d2 --theme 3`,
+  diagtool render diagram.d2 --theme 3
+
+Note: Format is auto-detected from output file extension (.png, .svg, .pdf).
+Use -f to explicitly override the format.`,
 	Args: cobra.ExactArgs(1),
 	RunE: runRender,
 }
@@ -79,8 +85,25 @@ func runRender(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to read input file: %w", err)
 	}
 
+	// Determine output file path first (to potentially auto-detect format)
+	outPath := outputFile
+	if outPath == "" {
+		// Will derive after we know the format
+		outPath = ""
+	}
+
 	// Determine output format
+	// Auto-detect from output file extension if -f not specified
 	format := strings.ToLower(outputFormat)
+	if format == "svg" && outPath != "" {
+		// Check if user specified a different extension (auto-detect)
+		ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(outPath), "."))
+		if ext == "png" || ext == "pdf" {
+			format = ext
+		}
+	}
+
+	// Validate format
 	switch format {
 	case "svg", "png", "pdf":
 		// Valid format
@@ -88,10 +111,8 @@ func runRender(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unsupported output format: %s (use svg, png, or pdf)", format)
 	}
 
-	// Determine output file path
-	outPath := outputFile
+	// Derive output path if not specified
 	if outPath == "" {
-		// Derive from input filename
 		base := strings.TrimSuffix(filepath.Base(inputFile), filepath.Ext(inputFile))
 		outPath = base + "." + format
 	}
