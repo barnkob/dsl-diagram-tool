@@ -81,7 +81,7 @@ go test ./...
 # Basic rendering (SVG)
 diagtool render diagram.d2
 
-# Render to PNG (requires playwright browsers)
+# Render to PNG (no setup required!)
 diagtool render diagram.d2 -f png
 
 # Specify output file
@@ -100,13 +100,8 @@ diagtool render diagram.d2 --theme 3
 diagtool render diagram.d2 --padding 50
 ```
 
-**PNG Export Requirements:**
-PNG export uses playwright to convert SVG to high-quality PNG. You need to install chromium:
-
-```bash
-# Install playwright browsers (one-time setup)
-go run github.com/playwright-community/playwright-go/cmd/playwright@latest install chromium
-```
+**PNG Export:**
+PNG export uses [resvg](https://github.com/RazrFalcon/resvg) (via WebAssembly) for high-quality SVG to PNG conversion. No external dependencies required - it's built right into the binary!
 
 ### Validate a D2 file
 

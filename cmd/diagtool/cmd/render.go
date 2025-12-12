@@ -30,11 +30,10 @@ var renderCmd = &cobra.Command{
 
 Supported output formats:
   - svg (default): Scalable Vector Graphics
-  - png: Portable Network Graphics (requires playwright browsers)
+  - png: Portable Network Graphics (using resvg)
   - pdf: Portable Document Format (not yet implemented)
 
-PNG export requires playwright browsers to be installed:
-  playwright install chromium
+PNG export uses resvg for high-quality conversion with no external dependencies.
 
 The output filename is derived from the input filename if not specified.
 For example, 'diagram.d2' will produce 'diagram.svg' by default.

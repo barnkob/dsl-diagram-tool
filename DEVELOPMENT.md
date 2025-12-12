@@ -24,13 +24,9 @@
 
    # Run the CLI
    ./bin/diagtool
-   ```
 
-4. **Optional: PNG Export Setup**
-   PNG export requires playwright browsers (for SVG to PNG conversion):
-   ```bash
-   # Install chromium browser (one-time setup)
-   go run github.com/playwright-community/playwright-go/cmd/playwright@latest install chromium
+   # Test PNG export (no setup required)
+   ./bin/diagtool render examples/01-basic-shapes.d2 -f png -o test.png
    ```
 
 ## Project Structure

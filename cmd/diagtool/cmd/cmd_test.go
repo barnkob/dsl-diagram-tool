@@ -161,10 +161,6 @@ func TestRenderCommand_WithTheme(t *testing.T) {
 }
 
 func TestRenderCommand_PNGExport(t *testing.T) {
-	// Skip if playwright browsers not installed
-	// This test requires: playwright install chromium
-	t.Skip("PNG export requires playwright browsers - skipping in automated tests")
-
 	tmpDir := t.TempDir()
 	inputFile := filepath.Join(tmpDir, "test.d2")
 	outputFilePath := filepath.Join(tmpDir, "test.png")
@@ -184,11 +180,16 @@ func TestRenderCommand_PNGExport(t *testing.T) {
 		t.Fatal("PNG output file was not created")
 	}
 
-	// Check it's actually a PNG (magic bytes)
+	// Check it's actually a PNG (magic bytes: 0x89 PNG)
 	content, _ := os.ReadFile(outputFilePath)
-	if len(content) < 4 || content[0] != 0x89 || content[1] != 'P' || content[2] != 'N' || content[3] != 'G' {
-		t.Error("Output is not a valid PNG file")
+	if len(content) < 8 {
+		t.Fatal("PNG file is too small")
 	}
+	if content[0] != 0x89 || content[1] != 'P' || content[2] != 'N' || content[3] != 'G' {
+		t.Error("Output is not a valid PNG file (incorrect magic bytes)")
+	}
+
+	t.Logf("PNG export successful: %d bytes", len(content))
 }
 
 func TestValidateCommand_RequiresInput(t *testing.T) {

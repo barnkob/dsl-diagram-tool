@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"io"
 
+	resvg "github.com/kanrichan/resvg-go"
 	"oss.terrastruct.com/d2/d2graph"
 	"oss.terrastruct.com/d2/d2layouts/d2dagrelayout"
 	"oss.terrastruct.com/d2/d2lib"
 	"oss.terrastruct.com/d2/d2renderers/d2svg"
-	"oss.terrastruct.com/d2/lib/png"
 	"oss.terrastruct.com/d2/lib/textmeasure"
 
 	"github.com/mark/dsl-diagram-tool/pkg/ir"
@@ -98,50 +98,27 @@ func NewSVGRendererWithOptions(opts Options) *SVGRenderer {
 	return &SVGRenderer{Options: opts}
 }
 
-// PNGRenderer renders diagrams to PNG format using D2's rendering pipeline.
-// This uses playwright under the hood to convert SVG to PNG.
+// PNGRenderer renders diagrams to PNG format using resvg-go.
+// This converts SVG to high-quality PNG without external dependencies.
 type PNGRenderer struct {
-	Options    Options
-	playwright png.Playwright
+	Options Options
 }
 
 // NewPNGRenderer creates a new PNG renderer with default options.
-// Initializes playwright for SVG to PNG conversion.
 func NewPNGRenderer() (*PNGRenderer, error) {
 	opts := DefaultOptions()
 	opts.Format = FormatPNG
-
-	pw, err := png.InitPlaywright()
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize playwright: %w", err)
-	}
-
-	return &PNGRenderer{
-		Options:    opts,
-		playwright: pw,
-	}, nil
+	return &PNGRenderer{Options: opts}, nil
 }
 
 // NewPNGRendererWithOptions creates a new PNG renderer with custom options.
 func NewPNGRendererWithOptions(opts Options) (*PNGRenderer, error) {
 	opts.Format = FormatPNG
-
-	pw, err := png.InitPlaywright()
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize playwright: %w", err)
-	}
-
-	return &PNGRenderer{
-		Options:    opts,
-		playwright: pw,
-	}, nil
+	return &PNGRenderer{Options: opts}, nil
 }
 
-// Close releases playwright resources. Should be called when done rendering.
+// Close releases resources. No-op for resvg-go (resources are per-render).
 func (r *PNGRenderer) Close() error {
-	if r.playwright.Browser != nil {
-		return r.playwright.Browser.Close()
-	}
 	return nil
 }
 
@@ -164,22 +141,35 @@ func (r *PNGRenderer) RenderToBytes(ctx context.Context, diagram *ir.Diagram) ([
 		return nil, fmt.Errorf("failed to render SVG for PNG conversion: %w", err)
 	}
 
-	// Convert SVG to PNG using playwright
-	page, err := r.playwright.Browser.NewPage()
+	// Initialize resvg context
+	resvgCtx, err := resvg.NewContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create browser page: %w", err)
+		return nil, fmt.Errorf("failed to initialize resvg context: %w", err)
 	}
-	defer page.Close()
+	defer resvgCtx.Close()
 
-	pngBytes, err := png.ConvertSVG(page, svgBytes)
+	// Create renderer
+	renderer, err := resvgCtx.NewRenderer()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resvg renderer: %w", err)
+	}
+	defer renderer.Close()
+
+	// Configure renderer
+	if r.Options.PixelDensity > 0 {
+		dpi := float32(r.Options.PixelDensity * 96) // Default DPI is 96
+		if err := renderer.SetDpi(dpi); err != nil {
+			return nil, fmt.Errorf("failed to set DPI: %w", err)
+		}
+	}
+
+	// Load system fonts for better text rendering
+	_ = renderer.LoadSystemFonts() // Ignore error, will use defaults
+
+	// Convert SVG to PNG using resvg
+	pngBytes, err := renderer.Render(svgBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert SVG to PNG: %w", err)
-	}
-
-	// Add EXIF metadata
-	pngBytes, err = png.AddExif(pngBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to add EXIF metadata: %w", err)
 	}
 
 	return pngBytes, nil
