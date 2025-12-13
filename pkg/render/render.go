@@ -5,11 +5,13 @@ package render
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"log/slog"
+	"time"
 
-	resvg "github.com/kanrichan/resvg-go"
+	"github.com/chromedp/chromedp"
 	"oss.terrastruct.com/d2/d2graph"
 	"oss.terrastruct.com/d2/d2layouts/d2dagrelayout"
 	"oss.terrastruct.com/d2/d2lib"
@@ -19,6 +21,7 @@ import (
 
 	"github.com/mark/dsl-diagram-tool/pkg/ir"
 )
+
 
 // Format represents the output format for rendering.
 type Format string
@@ -100,8 +103,9 @@ func NewSVGRendererWithOptions(opts Options) *SVGRenderer {
 	return &SVGRenderer{Options: opts}
 }
 
-// PNGRenderer renders diagrams to PNG format using resvg-go.
-// This converts SVG to high-quality PNG without external dependencies.
+// PNGRenderer renders diagrams to PNG format using chromedp (headless Chrome).
+// This provides high-quality PNG output with proper font rendering.
+// Requires Chrome/Chromium to be installed on the system.
 type PNGRenderer struct {
 	Options Options
 }
@@ -119,7 +123,7 @@ func NewPNGRendererWithOptions(opts Options) (*PNGRenderer, error) {
 	return &PNGRenderer{Options: opts}, nil
 }
 
-// Close releases resources. No-op for resvg-go (resources are per-render).
+// Close releases resources. No-op for chromedp (resources are per-render).
 func (r *PNGRenderer) Close() error {
 	return nil
 }
@@ -143,35 +147,45 @@ func (r *PNGRenderer) RenderToBytes(ctx context.Context, diagram *ir.Diagram) ([
 		return nil, fmt.Errorf("failed to render SVG for PNG conversion: %w", err)
 	}
 
-	// Initialize resvg context
-	resvgCtx, err := resvg.NewContext(ctx)
+	// Convert SVG to PNG using headless Chrome
+	return svgToPNG(ctx, svgBytes)
+}
+
+// svgToPNG converts SVG bytes to PNG using headless Chrome via chromedp.
+// This ensures proper font rendering since Chrome handles all fonts natively.
+func svgToPNG(ctx context.Context, svgBytes []byte) ([]byte, error) {
+	// Create a data URI for the SVG
+	dataURI := "data:image/svg+xml;base64," + base64.StdEncoding.EncodeToString(svgBytes)
+
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	// Create headless Chrome options
+	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.Flag("headless", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("no-sandbox", true),
+		chromedp.Flag("disable-dev-shm-usage", true),
+	)
+
+	allocCtx, allocCancel := chromedp.NewExecAllocator(ctx, opts...)
+	defer allocCancel()
+
+	// Create Chrome context
+	chromeCtx, chromeCancel := chromedp.NewContext(allocCtx)
+	defer chromeCancel()
+
+	var pngBytes []byte
+
+	// Navigate to SVG data URI and capture screenshot
+	// Quality of 100 means PNG format (0-99 would be JPEG)
+	err := chromedp.Run(chromeCtx,
+		chromedp.Navigate(dataURI),
+		chromedp.FullScreenshot(&pngBytes, 100),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize resvg context: %w", err)
-	}
-	defer resvgCtx.Close()
-
-	// Create renderer
-	renderer, err := resvgCtx.NewRenderer()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create resvg renderer: %w", err)
-	}
-	defer renderer.Close()
-
-	// Configure renderer
-	if r.Options.PixelDensity > 0 {
-		dpi := float32(r.Options.PixelDensity * 96) // Default DPI is 96
-		if err := renderer.SetDpi(dpi); err != nil {
-			return nil, fmt.Errorf("failed to set DPI: %w", err)
-		}
-	}
-
-	// Load system fonts for better text rendering
-	_ = renderer.LoadSystemFonts() // Ignore error, will use defaults
-
-	// Convert SVG to PNG using resvg
-	pngBytes, err := renderer.Render(svgBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert SVG to PNG: %w", err)
+		return nil, fmt.Errorf("failed to render PNG with Chrome: %w", err)
 	}
 
 	return pngBytes, nil
