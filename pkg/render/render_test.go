@@ -73,6 +73,47 @@ func TestNewSVGRendererWithOptions(t *testing.T) {
 	}
 }
 
+func TestNewPDFRenderer(t *testing.T) {
+	r, err := NewPDFRenderer()
+	if err != nil {
+		t.Fatalf("NewPDFRenderer failed: %v", err)
+	}
+	if r == nil {
+		t.Fatal("NewPDFRenderer returned nil")
+	}
+	if r.Options.Format != FormatPDF {
+		t.Errorf("Expected PDF format, got %s", r.Options.Format)
+	}
+}
+
+func TestNewPDFRendererWithOptions(t *testing.T) {
+	opts := Options{
+		ThemeID:  3,
+		Padding:  50,
+		Sketch:   true,
+		DarkMode: true,
+	}
+	r, err := NewPDFRendererWithOptions(opts)
+	if err != nil {
+		t.Fatalf("NewPDFRendererWithOptions failed: %v", err)
+	}
+	if r == nil {
+		t.Fatal("NewPDFRendererWithOptions returned nil")
+	}
+	if r.Options.ThemeID != 3 {
+		t.Errorf("Expected ThemeID 3, got %d", r.Options.ThemeID)
+	}
+	if r.Options.Padding != 50 {
+		t.Errorf("Expected Padding 50, got %d", r.Options.Padding)
+	}
+	if !r.Options.Sketch {
+		t.Error("Expected Sketch true")
+	}
+	if !r.Options.DarkMode {
+		t.Error("Expected DarkMode true")
+	}
+}
+
 func TestSVGRenderer_RenderToBytes_Simple(t *testing.T) {
 	// Create a simple diagram
 	diagram := &ir.Diagram{
@@ -600,4 +641,51 @@ func BenchmarkSVGRenderer_RenderToBytes(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_, _ = r.RenderToBytes(ctx, diagram)
 	}
+}
+
+// Integration test: Parse -> Render to PDF
+func TestPDFRenderer_RenderToBytes_Integration(t *testing.T) {
+	// Skip if Chrome is not available (CI environments)
+	if testing.Short() {
+		t.Skip("Skipping PDF test in short mode (requires Chrome)")
+	}
+
+	source := `
+server: Web Server
+database: Database { shape: cylinder }
+cache: Cache { shape: circle }
+
+server -> database: queries
+server -> cache: reads
+`
+
+	// Parse
+	p := parser.NewD2Parser()
+	diagram, err := p.Parse(source)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	// Render to PDF
+	r, err := NewPDFRenderer()
+	if err != nil {
+		t.Fatalf("NewPDFRenderer failed: %v", err)
+	}
+	defer r.Close()
+
+	ctx := context.Background()
+	pdfBytes, err := r.RenderToBytes(ctx, diagram)
+	if err != nil {
+		t.Fatalf("PDF render failed: %v", err)
+	}
+
+	// Verify PDF output (PDF files start with %PDF-)
+	if len(pdfBytes) < 100 {
+		t.Errorf("PDF output too small: %d bytes", len(pdfBytes))
+	}
+	if !bytes.HasPrefix(pdfBytes, []byte("%PDF-")) {
+		t.Error("Output doesn't start with PDF magic bytes %PDF-")
+	}
+
+	t.Logf("Generated PDF: %d bytes", len(pdfBytes))
 }

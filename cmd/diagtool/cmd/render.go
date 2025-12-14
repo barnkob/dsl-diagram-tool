@@ -37,7 +37,7 @@ var renderCmd = &cobra.Command{
 Supported output formats:
   - svg (default): Scalable Vector Graphics
   - png: Portable Network Graphics (using headless Chrome)
-  - pdf: Portable Document Format (not yet implemented)
+  - pdf: Portable Document Format (using headless Chrome)
 
 PNG export uses headless Chrome for high-quality conversion with proper font rendering.
 The default pixel density is 3x for crisp, high-DPI output. Use --pixel-density to adjust.
@@ -188,7 +188,25 @@ func doRender(cfg *renderConfig) error {
 			return fmt.Errorf("PNG rendering failed: %w", err)
 		}
 	case "pdf":
-		return fmt.Errorf("PDF export is not yet implemented (use svg or png for now)")
+		// Parse D2 to IR
+		p := parser.NewD2Parser()
+		diagram, err := p.Parse(string(content))
+		if err != nil {
+			return fmt.Errorf("parsing failed: %w", err)
+		}
+
+		// Create PDF renderer
+		pdfRenderer, err := render.NewPDFRendererWithOptions(cfg.opts)
+		if err != nil {
+			return fmt.Errorf("failed to initialize PDF renderer: %w", err)
+		}
+		defer pdfRenderer.Close()
+
+		// Render to PDF
+		output, err = pdfRenderer.RenderToBytes(ctx, diagram)
+		if err != nil {
+			return fmt.Errorf("PDF rendering failed: %w", err)
+		}
 	}
 
 	// Write output file

@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 	"oss.terrastruct.com/d2/d2graph"
 	"oss.terrastruct.com/d2/d2layouts/d2dagrelayout"
@@ -130,6 +131,54 @@ func (r *PNGRenderer) Close() error {
 	return nil
 }
 
+// PDFRenderer renders diagrams to PDF format using chromedp (headless Chrome).
+// This provides high-quality PDF output with proper font rendering and vector graphics.
+// Requires Chrome/Chromium to be installed on the system.
+type PDFRenderer struct {
+	Options Options
+}
+
+// NewPDFRenderer creates a new PDF renderer with default options.
+func NewPDFRenderer() (*PDFRenderer, error) {
+	opts := DefaultOptions()
+	opts.Format = FormatPDF
+	return &PDFRenderer{Options: opts}, nil
+}
+
+// NewPDFRendererWithOptions creates a new PDF renderer with custom options.
+func NewPDFRendererWithOptions(opts Options) (*PDFRenderer, error) {
+	opts.Format = FormatPDF
+	return &PDFRenderer{Options: opts}, nil
+}
+
+// Close releases resources. No-op for chromedp (resources are per-render).
+func (r *PDFRenderer) Close() error {
+	return nil
+}
+
+// Render renders the diagram to PDF format.
+func (r *PDFRenderer) Render(ctx context.Context, diagram *ir.Diagram, w io.Writer) error {
+	pdfBytes, err := r.RenderToBytes(ctx, diagram)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(pdfBytes)
+	return err
+}
+
+// RenderToBytes renders the diagram and returns PDF as bytes.
+func (r *PDFRenderer) RenderToBytes(ctx context.Context, diagram *ir.Diagram) ([]byte, error) {
+	// First render to SVG
+	svgRenderer := NewSVGRendererWithOptions(r.Options)
+	svgBytes, err := svgRenderer.RenderToBytes(ctx, diagram)
+	if err != nil {
+		return nil, fmt.Errorf("failed to render SVG for PDF conversion: %w", err)
+	}
+
+	// Convert SVG to PDF using headless Chrome
+	return svgToPDF(ctx, svgBytes)
+}
+
 // Render renders the diagram to PNG format.
 func (r *PNGRenderer) Render(ctx context.Context, diagram *ir.Diagram, w io.Writer) error {
 	pngBytes, err := r.RenderToBytes(ctx, diagram)
@@ -198,6 +247,60 @@ func svgToPNG(ctx context.Context, svgBytes []byte, pixelDensity int) ([]byte, e
 	}
 
 	return pngBytes, nil
+}
+
+// svgToPDF converts SVG bytes to PDF using headless Chrome via chromedp.
+// This ensures proper font rendering and maintains vector quality since Chrome
+// handles all rendering natively and outputs PDF with embedded fonts.
+func svgToPDF(ctx context.Context, svgBytes []byte) ([]byte, error) {
+	// Create a data URI for the SVG
+	dataURI := "data:image/svg+xml;base64," + base64.StdEncoding.EncodeToString(svgBytes)
+
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	// Create headless Chrome options
+	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.Flag("headless", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("no-sandbox", true),
+		chromedp.Flag("disable-dev-shm-usage", true),
+	)
+
+	allocCtx, allocCancel := chromedp.NewExecAllocator(ctx, opts...)
+	defer allocCancel()
+
+	// Create Chrome context
+	chromeCtx, chromeCancel := chromedp.NewContext(allocCtx)
+	defer chromeCancel()
+
+	var pdfBytes []byte
+
+	// Navigate to SVG data URI and print to PDF
+	err := chromedp.Run(chromeCtx,
+		chromedp.Navigate(dataURI),
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			buf, _, err := page.PrintToPDF().
+				WithPrintBackground(true).
+				WithMarginTop(0.4).
+				WithMarginBottom(0.4).
+				WithMarginLeft(0.4).
+				WithMarginRight(0.4).
+				WithPreferCSSPageSize(false).
+				Do(ctx)
+			if err != nil {
+				return err
+			}
+			pdfBytes = buf
+			return nil
+		}),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to render PDF with Chrome: %w", err)
+	}
+
+	return pdfBytes, nil
 }
 
 // Render renders the diagram to SVG format.
