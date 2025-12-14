@@ -373,7 +373,9 @@ make clean && make build
 
 ## License
 
-To be determined
+MIT License - see [LICENSE](LICENSE) file for details.
+
+Copyright (c) 2025 Mark Barnwell
 
 ## Acknowledgments
 
