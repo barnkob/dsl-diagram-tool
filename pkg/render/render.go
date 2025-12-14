@@ -58,7 +58,9 @@ type Options struct {
 	// Values > 1 produce larger output, < 1 produce smaller
 	Scale float64
 
-	// For PNG: pixel density (default: 2 for retina)
+	// For PNG: pixel density / device scale factor (default: 3)
+	// Higher values produce sharper PNGs at larger file sizes
+	// Common values: 1 (standard), 2 (retina), 3-4 (high DPI)
 	PixelDensity int
 }
 
@@ -72,7 +74,7 @@ func DefaultOptions() Options {
 		Padding:      100,
 		Center:       true,
 		Scale:        1.0,
-		PixelDensity: 2,
+		PixelDensity: 3, // Higher default for sharper PNGs
 	}
 }
 
@@ -147,13 +149,19 @@ func (r *PNGRenderer) RenderToBytes(ctx context.Context, diagram *ir.Diagram) ([
 		return nil, fmt.Errorf("failed to render SVG for PNG conversion: %w", err)
 	}
 
-	// Convert SVG to PNG using headless Chrome
-	return svgToPNG(ctx, svgBytes)
+	// Convert SVG to PNG using headless Chrome with specified pixel density
+	return svgToPNG(ctx, svgBytes, r.Options.PixelDensity)
 }
 
 // svgToPNG converts SVG bytes to PNG using headless Chrome via chromedp.
 // This ensures proper font rendering since Chrome handles all fonts natively.
-func svgToPNG(ctx context.Context, svgBytes []byte) ([]byte, error) {
+// The pixelDensity parameter controls the device scale factor (2 = retina, 3 = higher DPI).
+func svgToPNG(ctx context.Context, svgBytes []byte, pixelDensity int) ([]byte, error) {
+	// Ensure minimum pixel density of 1
+	if pixelDensity < 1 {
+		pixelDensity = 1
+	}
+
 	// Create a data URI for the SVG
 	dataURI := "data:image/svg+xml;base64," + base64.StdEncoding.EncodeToString(svgBytes)
 
@@ -161,12 +169,13 @@ func svgToPNG(ctx context.Context, svgBytes []byte) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	// Create headless Chrome options
+	// Create headless Chrome options with high DPI support
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", true),
 		chromedp.Flag("disable-gpu", true),
 		chromedp.Flag("no-sandbox", true),
 		chromedp.Flag("disable-dev-shm-usage", true),
+		chromedp.Flag("force-device-scale-factor", fmt.Sprintf("%d", pixelDensity)),
 	)
 
 	allocCtx, allocCancel := chromedp.NewExecAllocator(ctx, opts...)

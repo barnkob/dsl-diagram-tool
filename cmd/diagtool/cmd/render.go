@@ -26,6 +26,7 @@ var (
 	padding      int64
 	noCenter     bool
 	watchMode    bool
+	pixelDensity int
 )
 
 var renderCmd = &cobra.Command{
@@ -35,10 +36,11 @@ var renderCmd = &cobra.Command{
 
 Supported output formats:
   - svg (default): Scalable Vector Graphics
-  - png: Portable Network Graphics (using resvg)
+  - png: Portable Network Graphics (using headless Chrome)
   - pdf: Portable Document Format (not yet implemented)
 
-PNG export uses resvg for high-quality conversion with no external dependencies.
+PNG export uses headless Chrome for high-quality conversion with proper font rendering.
+The default pixel density is 3x for crisp, high-DPI output. Use --pixel-density to adjust.
 
 The output filename is derived from the input filename if not specified.
 For example, 'diagram.d2' will produce 'diagram.svg' by default.
@@ -49,6 +51,9 @@ Examples:
 
   # Render to PNG (auto-detected from extension)
   diagtool render diagram.d2 -o diagram.png
+
+  # Render to PNG with extra-high resolution
+  diagtool render diagram.d2 -o diagram.png --pixel-density 4
 
   # Render to PNG (explicit format)
   diagtool render diagram.d2 -f png
@@ -84,6 +89,7 @@ func init() {
 	renderCmd.Flags().Int64VarP(&padding, "padding", "p", 100, "Padding around diagram in pixels")
 	renderCmd.Flags().BoolVar(&noCenter, "no-center", false, "Don't center the diagram")
 	renderCmd.Flags().BoolVarP(&watchMode, "watch", "w", false, "Watch input file for changes and auto-regenerate")
+	renderCmd.Flags().IntVar(&pixelDensity, "pixel-density", 3, "PNG pixel density/DPI multiplier (1=standard, 2=retina, 3-4=high-DPI)")
 }
 
 // renderConfig holds the resolved configuration for rendering
@@ -126,13 +132,14 @@ func resolveRenderConfig(inputFile string) (*renderConfig, error) {
 
 	// Create render options
 	opts := render.Options{
-		Format:   render.Format(format),
-		ThemeID:  themeID,
-		DarkMode: darkMode,
-		Sketch:   sketchMode,
-		Padding:  padding,
-		Center:   !noCenter,
-		Scale:    1.0,
+		Format:       render.Format(format),
+		ThemeID:      themeID,
+		DarkMode:     darkMode,
+		Sketch:       sketchMode,
+		Padding:      padding,
+		Center:       !noCenter,
+		Scale:        1.0,
+		PixelDensity: pixelDensity,
 	}
 
 	return &renderConfig{
