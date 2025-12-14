@@ -22,6 +22,7 @@ func newTestRootCmd() *cobra.Command {
 	noCenter = false
 	verbose = false
 	watchMode = false
+	pixelDensity = 3
 
 	// Create fresh commands
 	testRoot := &cobra.Command{
@@ -487,5 +488,382 @@ func TestWatchFlag_Recognized(t *testing.T) {
 	}
 	if flag.Shorthand != "w" {
 		t.Errorf("Expected shorthand 'w', got '%s'", flag.Shorthand)
+	}
+}
+
+// WP26: Additional comprehensive CLI tests
+
+// PDF Export Tests
+func TestRenderCommand_PDFExport(t *testing.T) {
+	tmpDir := t.TempDir()
+	inputFile := filepath.Join(tmpDir, "test.d2")
+	outputFilePath := filepath.Join(tmpDir, "test.pdf")
+
+	os.WriteFile(inputFile, []byte("server -> database: connects"), 0644)
+
+	cmd := newTestRootCmd()
+	cmd.SetArgs([]string{"render", inputFile, "-f", "pdf", "-o", outputFilePath})
+	err := cmd.Execute()
+
+	if err != nil {
+		t.Fatalf("PDF render failed: %v", err)
+	}
+
+	// Check output file exists
+	if _, err := os.Stat(outputFilePath); os.IsNotExist(err) {
+		t.Fatal("PDF output file was not created")
+	}
+
+	// Check it's actually a PDF (magic bytes: %PDF-)
+	content, _ := os.ReadFile(outputFilePath)
+	if len(content) < 100 {
+		t.Fatal("PDF file is too small")
+	}
+	if !strings.HasPrefix(string(content), "%PDF-") {
+		t.Error("Output is not a valid PDF file (incorrect magic bytes)")
+	}
+
+	t.Logf("PDF export successful: %d bytes", len(content))
+}
+
+func TestRenderCommand_PDFAutoDetect(t *testing.T) {
+	tmpDir := t.TempDir()
+	inputFile := filepath.Join(tmpDir, "test.d2")
+	outputFilePath := filepath.Join(tmpDir, "diagram.pdf")
+
+	os.WriteFile(inputFile, []byte("a -> b"), 0644)
+
+	cmd := newTestRootCmd()
+	// No -f flag, should auto-detect from .pdf extension
+	cmd.SetArgs([]string{"render", inputFile, "-o", outputFilePath})
+	err := cmd.Execute()
+
+	if err != nil {
+		t.Fatalf("PDF auto-detect failed: %v", err)
+	}
+
+	content, _ := os.ReadFile(outputFilePath)
+	if !strings.HasPrefix(string(content), "%PDF-") {
+		t.Error("Output should be PDF based on file extension")
+	}
+}
+
+func TestResolveRenderConfig_AutoDetectPDF(t *testing.T) {
+	outputFile = "output.pdf"
+	outputFormat = "svg" // Default, should be overridden
+
+	cfg, err := resolveRenderConfig("diagram.d2")
+	if err != nil {
+		t.Fatalf("resolveRenderConfig failed: %v", err)
+	}
+
+	if cfg.format != "pdf" {
+		t.Errorf("Expected format 'pdf' (auto-detected), got '%s'", cfg.format)
+	}
+}
+
+// Pixel Density Tests
+func TestPixelDensityFlag_Recognized(t *testing.T) {
+	flag := renderCmd.Flags().Lookup("pixel-density")
+	if flag == nil {
+		t.Fatal("pixel-density flag not found")
+	}
+	if flag.DefValue != "3" {
+		t.Errorf("Expected default pixel-density '3', got '%s'", flag.DefValue)
+	}
+}
+
+func TestRenderCommand_PNGWithPixelDensity(t *testing.T) {
+	tmpDir := t.TempDir()
+	inputFile := filepath.Join(tmpDir, "test.d2")
+	outputFilePath := filepath.Join(tmpDir, "highres.png")
+
+	os.WriteFile(inputFile, []byte("x -> y"), 0644)
+
+	cmd := newTestRootCmd()
+	cmd.SetArgs([]string{"render", inputFile, "-o", outputFilePath, "--pixel-density", "4"})
+	err := cmd.Execute()
+
+	if err != nil {
+		t.Fatalf("PNG with custom pixel density failed: %v", err)
+	}
+
+	// Verify PNG was created
+	content, _ := os.ReadFile(outputFilePath)
+	if content[0] != 0x89 || content[1] != 'P' {
+		t.Error("Output should be PNG")
+	}
+}
+
+// Flag Combination Tests
+func TestRenderCommand_DarkModeWithSketch(t *testing.T) {
+	tmpDir := t.TempDir()
+	inputFile := filepath.Join(tmpDir, "test.d2")
+	outputFilePath := filepath.Join(tmpDir, "dark-sketch.svg")
+
+	os.WriteFile(inputFile, []byte("a -> b"), 0644)
+
+	cmd := newTestRootCmd()
+	cmd.SetArgs([]string{"render", inputFile, "-o", outputFilePath, "--dark", "--sketch"})
+	err := cmd.Execute()
+
+	if err != nil {
+		t.Fatalf("Dark mode + sketch failed: %v", err)
+	}
+
+	if _, err := os.Stat(outputFilePath); os.IsNotExist(err) {
+		t.Error("Output file was not created")
+	}
+}
+
+func TestRenderCommand_AllFlags(t *testing.T) {
+	tmpDir := t.TempDir()
+	inputFile := filepath.Join(tmpDir, "test.d2")
+	outputFilePath := filepath.Join(tmpDir, "all-flags.svg")
+
+	os.WriteFile(inputFile, []byte("server -> db"), 0644)
+
+	cmd := newTestRootCmd()
+	cmd.SetArgs([]string{
+		"render", inputFile,
+		"-o", outputFilePath,
+		"--theme", "5",
+		"--dark",
+		"--sketch",
+		"--padding", "50",
+		"--no-center",
+	})
+	err := cmd.Execute()
+
+	if err != nil {
+		t.Fatalf("Render with all flags failed: %v", err)
+	}
+
+	if _, err := os.Stat(outputFilePath); os.IsNotExist(err) {
+		t.Error("Output file was not created")
+	}
+}
+
+func TestRenderCommand_PDFWithOptions(t *testing.T) {
+	tmpDir := t.TempDir()
+	inputFile := filepath.Join(tmpDir, "test.d2")
+	outputFilePath := filepath.Join(tmpDir, "styled.pdf")
+
+	os.WriteFile(inputFile, []byte("api -> database"), 0644)
+
+	cmd := newTestRootCmd()
+	cmd.SetArgs([]string{
+		"render", inputFile,
+		"-o", outputFilePath,
+		"--dark",
+		"--theme", "2",
+		"--padding", "150",
+	})
+	err := cmd.Execute()
+
+	if err != nil {
+		t.Fatalf("PDF with options failed: %v", err)
+	}
+
+	content, _ := os.ReadFile(outputFilePath)
+	if !strings.HasPrefix(string(content), "%PDF-") {
+		t.Error("Output should be PDF")
+	}
+}
+
+func TestRenderCommand_PNGWithDarkMode(t *testing.T) {
+	tmpDir := t.TempDir()
+	inputFile := filepath.Join(tmpDir, "test.d2")
+	outputFilePath := filepath.Join(tmpDir, "dark.png")
+
+	os.WriteFile(inputFile, []byte("client -> server"), 0644)
+
+	cmd := newTestRootCmd()
+	cmd.SetArgs([]string{
+		"render", inputFile,
+		"-o", outputFilePath,
+		"--dark",
+		"--pixel-density", "2",
+	})
+	err := cmd.Execute()
+
+	if err != nil {
+		t.Fatalf("PNG with dark mode failed: %v", err)
+	}
+
+	content, _ := os.ReadFile(outputFilePath)
+	if content[0] != 0x89 || content[1] != 'P' {
+		t.Error("Output should be PNG")
+	}
+}
+
+// Version Command Tests
+func TestVersionCommand_Execute(t *testing.T) {
+	cmd := newTestRootCmd()
+	cmd.SetArgs([]string{"version"})
+	err := cmd.Execute()
+
+	if err != nil {
+		t.Fatalf("version command failed: %v", err)
+	}
+}
+
+// Edge Case Tests
+func TestRenderCommand_NoCenterFlag(t *testing.T) {
+	tmpDir := t.TempDir()
+	inputFile := filepath.Join(tmpDir, "test.d2")
+	outputFilePath := filepath.Join(tmpDir, "no-center.svg")
+
+	os.WriteFile(inputFile, []byte("a -> b"), 0644)
+
+	cmd := newTestRootCmd()
+	cmd.SetArgs([]string{"render", inputFile, "-o", outputFilePath, "--no-center"})
+	err := cmd.Execute()
+
+	if err != nil {
+		t.Fatalf("Render with --no-center failed: %v", err)
+	}
+
+	if _, err := os.Stat(outputFilePath); os.IsNotExist(err) {
+		t.Error("Output file was not created")
+	}
+}
+
+func TestRenderCommand_CustomPadding(t *testing.T) {
+	tmpDir := t.TempDir()
+	inputFile := filepath.Join(tmpDir, "test.d2")
+	outputFilePath := filepath.Join(tmpDir, "padded.svg")
+
+	os.WriteFile(inputFile, []byte("x -> y"), 0644)
+
+	cmd := newTestRootCmd()
+	cmd.SetArgs([]string{"render", inputFile, "-o", outputFilePath, "--padding", "200"})
+	err := cmd.Execute()
+
+	if err != nil {
+		t.Fatalf("Render with custom padding failed: %v", err)
+	}
+
+	if _, err := os.Stat(outputFilePath); os.IsNotExist(err) {
+		t.Error("Output file was not created")
+	}
+}
+
+func TestRenderCommand_MinimalPadding(t *testing.T) {
+	tmpDir := t.TempDir()
+	inputFile := filepath.Join(tmpDir, "test.d2")
+	outputFilePath := filepath.Join(tmpDir, "minimal.svg")
+
+	os.WriteFile(inputFile, []byte("a -> b"), 0644)
+
+	cmd := newTestRootCmd()
+	cmd.SetArgs([]string{"render", inputFile, "-o", outputFilePath, "-p", "0"})
+	err := cmd.Execute()
+
+	if err != nil {
+		t.Fatalf("Render with minimal padding failed: %v", err)
+	}
+
+	if _, err := os.Stat(outputFilePath); os.IsNotExist(err) {
+		t.Error("Output file was not created")
+	}
+}
+
+func TestRenderCommand_EmptyD2File(t *testing.T) {
+	tmpDir := t.TempDir()
+	inputFile := filepath.Join(tmpDir, "empty.d2")
+	outputFilePath := filepath.Join(tmpDir, "empty.svg")
+
+	os.WriteFile(inputFile, []byte(""), 0644)
+
+	cmd := newTestRootCmd()
+	cmd.SetArgs([]string{"render", inputFile, "-o", outputFilePath})
+	err := cmd.Execute()
+
+	// Empty D2 files should still render (just an empty diagram)
+	if err != nil {
+		t.Fatalf("Render empty file failed: %v", err)
+	}
+}
+
+func TestRenderCommand_ComplexD2(t *testing.T) {
+	tmpDir := t.TempDir()
+	inputFile := filepath.Join(tmpDir, "complex.d2")
+	outputFilePath := filepath.Join(tmpDir, "complex.svg")
+
+	complexD2 := `
+direction: right
+
+users: Users {
+	shape: person
+	style.fill: "#ffd700"
+}
+
+api: API Server {
+	shape: rectangle
+	style.stroke: "#0066cc"
+	style.stroke-width: 3
+}
+
+db: Database {
+	shape: cylinder
+	style.fill: "#90ee90"
+}
+
+cache: Redis Cache {
+	shape: circle
+}
+
+users -> api: HTTP requests
+api -> db: SQL queries
+api -> cache: Get/Set
+db -> cache: Cache invalidation
+`
+
+	os.WriteFile(inputFile, []byte(complexD2), 0644)
+
+	cmd := newTestRootCmd()
+	cmd.SetArgs([]string{"render", inputFile, "-o", outputFilePath})
+	err := cmd.Execute()
+
+	if err != nil {
+		t.Fatalf("Render complex D2 failed: %v", err)
+	}
+
+	content, _ := os.ReadFile(outputFilePath)
+	if !strings.Contains(string(content), "<svg") {
+		t.Error("Output should contain SVG")
+	}
+}
+
+// Validate additional edge cases
+func TestValidateCommand_EmptyFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	inputFile := filepath.Join(tmpDir, "empty.d2")
+
+	os.WriteFile(inputFile, []byte(""), 0644)
+
+	cmd := newTestRootCmd()
+	cmd.SetArgs([]string{"validate", inputFile})
+	err := cmd.Execute()
+
+	// Empty files should validate successfully
+	if err != nil {
+		t.Fatalf("Validate empty file should succeed: %v", err)
+	}
+}
+
+func TestValidateCommand_WithVerbose(t *testing.T) {
+	tmpDir := t.TempDir()
+	inputFile := filepath.Join(tmpDir, "test.d2")
+
+	os.WriteFile(inputFile, []byte("a -> b\nb -> c"), 0644)
+
+	cmd := newTestRootCmd()
+	cmd.SetArgs([]string{"validate", inputFile, "-v"})
+	err := cmd.Execute()
+
+	if err != nil {
+		t.Fatalf("Validate with verbose failed: %v", err)
 	}
 }
