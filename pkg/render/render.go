@@ -23,7 +23,6 @@ import (
 	"github.com/mark/dsl-diagram-tool/pkg/ir"
 )
 
-
 // Format represents the output format for rendering.
 type Format string
 

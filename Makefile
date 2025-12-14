@@ -1,4 +1,4 @@
-.PHONY: help build test test-v test-cover clean fmt vet lint install run all
+.PHONY: help build test test-v test-cover clean fmt vet lint install run all serve
 
 # Default target
 .DEFAULT_GOAL := help
@@ -99,3 +99,8 @@ verify: fmt vet test
 ## all: Build and run all checks
 all: clean verify build
 	@echo "✓ Build complete and all checks passed"
+
+## serve: Build and start the diagram editor server
+serve: build
+	@echo "Starting diagram editor..."
+	@./bin/diagtool serve $(FILE)
