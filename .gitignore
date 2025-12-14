@@ -1,6 +1,8 @@
 # Binaries
 bin/
-dist/
+/dist/
+# Allow embedded web files
+!pkg/server/web/dist/
 *.exe
 *.dll
 *.so

@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DiagTool Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+        .editor-pane {
+            display: flex;
+            flex-direction: column;
+            min-width: 200px;
+            background: #1e1e1e;
+        }
+        .canvas-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #252526;
+            min-width: 200px;
+        }
+        .resizer {
+            width: 4px;
+            background: #333;
+            cursor: col-resize;
+            transition: background 0.2s;
+        }
+        .resizer:hover, .resizer.active {
+            background: #0e639c;
+        }
+        .header {
+            padding: 8px 16px;
+            background: #333;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 13px;
+            flex-shrink: 0;
+        }
+        .header h1 {
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .status {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #888;
+        }
+        .status-dot.connected {
+            background: #4caf50;
+        }
+        .status-dot.error {
+            background: #f44336;
+        }
+        #editor {
+            flex: 1;
+            width: 100%;
+        }
+        .canvas-container {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+        #canvas {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            cursor: grab;
+        }
+        #canvas.dragging {
+            cursor: grabbing;
+        }
+        #canvas svg {
+            transform-origin: 0 0;
+        }
+        .error-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            max-height: 40%;
+            overflow: auto;
+            background: rgba(30, 30, 30, 0.95);
+            border-top: 1px solid #f44336;
+            display: none;
+        }
+        .error-container.visible {
+            display: block;
+        }
+        .error-header {
+            padding: 8px 12px;
+            background: #5a1d1d;
+            color: #f88;
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .error-close {
+            background: none;
+            border: none;
+            color: #f88;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 0 4px;
+        }
+        .error-content {
+            padding: 12px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            color: #f88;
+            line-height: 1.5;
+        }
+        .toolbar {
+            padding: 4px 8px;
+            background: #2d2d2d;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .toolbar button {
+            padding: 4px 12px;
+            background: #0e639c;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .toolbar button:hover {
+            background: #1177bb;
+        }
+        .toolbar button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        .toolbar button.secondary {
+            background: #3c3c3c;
+        }
+        .toolbar button.secondary:hover {
+            background: #4c4c4c;
+        }
+        .file-path {
+            color: #888;
+            font-size: 12px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 300px;
+        }
+        .zoom-controls {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            margin-left: auto;
+        }
+        .zoom-level {
+            font-size: 12px;
+            color: #888;
+            min-width: 50px;
+            text-align: center;
+        }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            background: #333;
+            border-radius: 4px;
+            font-size: 13px;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+        .toast.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .toast.success {
+            background: #1b5e20;
+        }
+        .toast.warning {
+            background: #e65100;
+        }
+        .file-changed-banner {
+            padding: 8px 16px;
+            background: #664d00;
+            color: #ffd54f;
+            font-size: 12px;
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .file-changed-banner.visible {
+            display: flex;
+        }
+        .file-changed-banner button {
+            padding: 2px 8px;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="editor-pane" id="editorPane" style="width: 50%;">
+            <div class="header">
+                <h1>DiagTool Editor</h1>
+                <span class="file-path" id="filePath" title=""></span>
+                <div class="status">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span id="statusText">Connecting...</span>
+                </div>
+            </div>
+            <div class="file-changed-banner" id="fileChangedBanner">
+                <span>File changed on disk</span>
+                <div>
+                    <button onclick="reloadFile()">Reload</button>
+                    <button onclick="dismissBanner()" class="secondary">Dismiss</button>
+                </div>
+            </div>
+            <div class="toolbar">
+                <button id="saveBtn" disabled>Save (Ctrl+S)</button>
+            </div>
+            <div id="editor"></div>
+        </div>
+        <div class="resizer" id="resizer"></div>
+        <div class="canvas-pane">
+            <div class="header">
+                <h1>Preview</h1>
+                <div class="zoom-controls">
+                    <button class="secondary" onclick="zoomOut()" title="Zoom out">−</button>
+                    <span class="zoom-level" id="zoomLevel">100%</span>
+                    <button class="secondary" onclick="zoomIn()" title="Zoom in">+</button>
+                    <button class="secondary" onclick="resetZoom()" title="Fit to view">Fit</button>
+                </div>
+            </div>
+            <div class="canvas-container">
+                <div id="canvas"></div>
+                <div class="error-container" id="errorContainer">
+                    <div class="error-header">
+                        <span>Compilation Error</span>
+                        <button class="error-close" onclick="hideError()">×</button>
+                    </div>
+                    <div class="error-content" id="errorContent"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="toast" id="toast"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+    <script>
+        // Monaco Editor setup
+        require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
+
+        let editor;
+        let ws;
+        let debounceTimer;
+        let isDirty = false;
+        let pendingExternalContent = null;
+        const DEBOUNCE_DELAY = 300;
+
+        // Canvas state
+        let zoom = 1;
+        let panX = 0;
+        let panY = 0;
+        let isPanning = false;
+        let startX, startY;
+
+        // DOM elements
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const canvas = document.getElementById('canvas');
+        const errorContainer = document.getElementById('errorContainer');
+        const errorContent = document.getElementById('errorContent');
+        const saveBtn = document.getElementById('saveBtn');
+        const filePath = document.getElementById('filePath');
+        const zoomLevel = document.getElementById('zoomLevel');
+        const toast = document.getElementById('toast');
+        const fileChangedBanner = document.getElementById('fileChangedBanner');
+        const editorPane = document.getElementById('editorPane');
+        const resizer = document.getElementById('resizer');
+
+        // Initialize Monaco Editor
+        require(['vs/editor/editor.main'], function () {
+            // Register D2 language
+            monaco.languages.register({ id: 'd2' });
+            monaco.languages.setMonarchTokensProvider('d2', {
+                tokenizer: {
+                    root: [
+                        [/#.*$/, 'comment'],
+                        [/"[^"]*"/, 'string'],
+                        [/'[^']*'/, 'string'],
+                        [/\|[^|]*\|/, 'string.markdown'],
+                        [/->|<->|<-|--/, 'operator'],
+                        [/\b(shape|style|label|icon|constraint|tooltip|link|near|width|height|direction|grid-rows|grid-columns|grid-gap|vertical-gap|horizontal-gap)\b:/, 'keyword'],
+                        [/\b(rectangle|square|page|parallelogram|document|cylinder|queue|package|step|callout|stored_data|person|diamond|oval|circle|hexagon|cloud|text|code|class|sql_table|image|sequence_diagram)\b/, 'type'],
+                        [/\b(fill|stroke|stroke-width|stroke-dash|border-radius|opacity|shadow|3d|multiple|double-border|font|font-size|font-color|bold|italic|underline|animated|source-arrowhead|target-arrowhead)\b:/, 'attribute'],
+                        [/\b(up|down|left|right)\b/, 'constant'],
+                        [/\{/, 'delimiter.bracket'],
+                        [/\}/, 'delimiter.bracket'],
+                        [/:/, 'delimiter'],
+                        [/[a-zA-Z_][a-zA-Z0-9_-]*/, 'identifier'],
+                    ]
+                }
+            });
+
+            // Define D2 theme colors
+            monaco.editor.defineTheme('d2-dark', {
+                base: 'vs-dark',
+                inherit: true,
+                rules: [
+                    { token: 'comment', foreground: '6A9955' },
+                    { token: 'string', foreground: 'CE9178' },
+                    { token: 'string.markdown', foreground: 'CE9178', fontStyle: 'italic' },
+                    { token: 'keyword', foreground: '569CD6' },
+                    { token: 'type', foreground: '4EC9B0' },
+                    { token: 'attribute', foreground: '9CDCFE' },
+                    { token: 'operator', foreground: 'DCDCAA' },
+                    { token: 'constant', foreground: 'B5CEA8' },
+                    { token: 'identifier', foreground: 'D4D4D4' },
+                ],
+                colors: {}
+            });
+
+            editor = monaco.editor.create(document.getElementById('editor'), {
+                value: '# Loading...',
+                language: 'd2',
+                theme: 'd2-dark',
+                automaticLayout: true,
+                minimap: { enabled: false },
+                fontSize: 14,
+                lineNumbers: 'on',
+                scrollBeyondLastLine: false,
+                wordWrap: 'on',
+                tabSize: 2,
+                renderWhitespace: 'selection',
+                bracketPairColorization: { enabled: true },
+            });
+
+            // Listen for changes
+            editor.onDidChangeModelContent(() => {
+                isDirty = true;
+                saveBtn.disabled = false;
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(render, DEBOUNCE_DELAY);
+            });
+
+            // Keyboard shortcuts
+            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, save);
+
+            // Connect to WebSocket
+            connectWebSocket();
+        });
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/api/ws`);
+
+            ws.onopen = () => {
+                statusDot.className = 'status-dot connected';
+                statusText.textContent = 'Connected';
+            };
+
+            ws.onclose = () => {
+                statusDot.className = 'status-dot';
+                statusText.textContent = 'Reconnecting...';
+                setTimeout(connectWebSocket, 2000);
+            };
+
+            ws.onerror = () => {
+                statusDot.className = 'status-dot error';
+                statusText.textContent = 'Error';
+            };
+
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                switch (msg.type) {
+                    case 'rendered':
+                        showSVG(msg.svg);
+                        hideError();
+                        break;
+                    case 'error':
+                        showError(msg.error);
+                        break;
+                    case 'file-changed':
+                        handleFileChanged(msg.source);
+                        break;
+                    case 'saved':
+                        isDirty = false;
+                        saveBtn.disabled = true;
+                        showToast('Saved', 'success');
+                        break;
+                }
+            };
+        }
+
+        function handleFileChanged(source) {
+            if (isDirty) {
+                // Show banner if user has unsaved changes
+                pendingExternalContent = source;
+                fileChangedBanner.classList.add('visible');
+            } else {
+                // Auto-reload if no unsaved changes
+                if (editor && source !== undefined) {
+                    editor.setValue(source);
+                    isDirty = false;
+                    saveBtn.disabled = true;
+                }
+            }
+        }
+
+        function reloadFile() {
+            if (pendingExternalContent !== null) {
+                editor.setValue(pendingExternalContent);
+                pendingExternalContent = null;
+                isDirty = false;
+                saveBtn.disabled = true;
+            }
+            dismissBanner();
+        }
+
+        function dismissBanner() {
+            fileChangedBanner.classList.remove('visible');
+            pendingExternalContent = null;
+        }
+
+        function render() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            const source = editor.getValue();
+            ws.send(JSON.stringify({ type: 'render', source }));
+        }
+
+        function save() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            const source = editor.getValue();
+            ws.send(JSON.stringify({ type: 'save', source }));
+        }
+
+        function showSVG(svg) {
+            canvas.innerHTML = svg;
+            const svgEl = canvas.querySelector('svg');
+            if (svgEl) {
+                updateTransform();
+            }
+        }
+
+        function showError(error) {
+            // Parse error to highlight line numbers
+            const formatted = error.replace(/line (\d+)/gi, '<strong>line $1</strong>');
+            errorContent.innerHTML = formatted;
+            errorContainer.classList.add('visible');
+        }
+
+        function hideError() {
+            errorContainer.classList.remove('visible');
+        }
+
+        function showToast(message, type = '') {
+            toast.textContent = message;
+            toast.className = 'toast visible ' + type;
+            setTimeout(() => {
+                toast.classList.remove('visible');
+            }, 2000);
+        }
+
+        // Zoom controls
+        function zoomIn() {
+            zoom = Math.min(zoom * 1.25, 5);
+            updateTransform();
+        }
+
+        function zoomOut() {
+            zoom = Math.max(zoom / 1.25, 0.1);
+            updateTransform();
+        }
+
+        function resetZoom() {
+            const svgEl = canvas.querySelector('svg');
+            if (!svgEl) return;
+
+            const container = canvas.parentElement;
+            const containerRect = container.getBoundingClientRect();
+            const svgRect = svgEl.getBoundingClientRect();
+
+            // Get the natural size from viewBox
+            const viewBox = svgEl.getAttribute('viewBox');
+            if (viewBox) {
+                const [, , width, height] = viewBox.split(' ').map(Number);
+                const scaleX = (containerRect.width - 40) / width;
+                const scaleY = (containerRect.height - 40) / height;
+                zoom = Math.min(scaleX, scaleY, 1);
+            } else {
+                zoom = 1;
+            }
+
+            panX = 20;
+            panY = 20;
+            updateTransform();
+        }
+
+        function updateTransform() {
+            const svgEl = canvas.querySelector('svg');
+            if (svgEl) {
+                svgEl.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+            }
+            zoomLevel.textContent = Math.round(zoom * 100) + '%';
+        }
+
+        // Pan controls
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.button === 0) {
+                isPanning = true;
+                startX = e.clientX - panX;
+                startY = e.clientY - panY;
+                canvas.classList.add('dragging');
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isPanning) {
+                panX = e.clientX - startX;
+                panY = e.clientY - startY;
+                updateTransform();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isPanning = false;
+            canvas.classList.remove('dragging');
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            isPanning = false;
+            canvas.classList.remove('dragging');
+        });
+
+        // Mouse wheel zoom
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            const newZoom = Math.max(0.1, Math.min(5, zoom * delta));
+
+            // Zoom towards mouse position
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            const dx = (mouseX - panX) * (1 - newZoom / zoom);
+            const dy = (mouseY - panY) * (1 - newZoom / zoom);
+
+            panX += dx;
+            panY += dy;
+            zoom = newZoom;
+
+            updateTransform();
+        }, { passive: false });
+
+        // Resizer
+        let isResizing = false;
+
+        resizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            resizer.classList.add('active');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            const containerWidth = document.querySelector('.container').offsetWidth;
+            const newWidth = Math.max(200, Math.min(e.clientX, containerWidth - 200));
+            editorPane.style.width = newWidth + 'px';
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                resizer.classList.remove('active');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            }
+        });
+
+        // Save button click
+        saveBtn.addEventListener('click', save);
+
+        // Fetch file path on load
+        fetch('/api/file')
+            .then(res => res.json())
+            .then(data => {
+                if (data.filePath) {
+                    const shortPath = data.filePath.split('/').slice(-2).join('/');
+                    filePath.textContent = shortPath;
+                    filePath.title = data.filePath;
+                }
+            });
+
+        // Auto-fit on first render
+        let firstRender = true;
+        const originalShowSVG = showSVG;
+        showSVG = function(svg) {
+            originalShowSVG(svg);
+            if (firstRender) {
+                firstRender = false;
+                setTimeout(resetZoom, 100);
+            }
+        };
+    </script>
+</body>
+</html>
