@@ -10,9 +10,9 @@ import (
 
 // Version information (set at build time)
 var (
-	Version   = "0.1.0-dev"
-	BuildDate = "unknown"
-	GitCommit = "unknown"
+	Version   = "1.0.0"
+	BuildDate = "2025-12-14"
+	GitCommit = "HEAD"
 )
 
 var rootCmd = &cobra.Command{
