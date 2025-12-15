@@ -30,6 +30,10 @@ type Server struct {
 	// Current file content (cached)
 	fileContent   string
 	fileContentMu sync.RWMutex
+
+	// Position metadata
+	metadata   *Metadata
+	metadataMu sync.RWMutex
 }
 
 // Options configures the server.
@@ -69,6 +73,21 @@ func New(opts Options) (*Server, error) {
 			return nil, fmt.Errorf("failed to read file: %w", err)
 		}
 		s.fileContent = string(content)
+
+		// Load metadata (positions)
+		meta, err := LoadMetadata(s.FilePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load metadata: %w", err)
+		}
+		s.metadata = meta
+
+		// Validate metadata against current source
+		if s.metadata.ValidateAndClean(s.fileContent) {
+			// Source changed, save cleared metadata
+			_ = SaveMetadata(s.FilePath, s.metadata)
+		}
+	} else {
+		s.metadata = NewMetadata()
 	}
 
 	return s, nil
@@ -219,11 +238,26 @@ func (s *Server) handleFileChanged() {
 	s.fileContent = newContent
 	s.fileContentMu.Unlock()
 
-	// Broadcast to all clients
+	// Check if positions should be cleared (source hash changed)
+	s.metadataMu.Lock()
+	positionsCleared := s.metadata.ValidateAndClean(newContent)
+	if positionsCleared {
+		_ = SaveMetadata(s.FilePath, s.metadata)
+	}
+	s.metadataMu.Unlock()
+
+	// Broadcast file change to all clients
 	s.broadcast(WSMessage{
 		Type:   "file-changed",
 		Source: newContent,
 	})
+
+	// If positions were cleared, notify clients
+	if positionsCleared {
+		s.broadcast(WSMessage{
+			Type: "positions-cleared",
+		})
+	}
 }
 
 // broadcast sends a message to all connected WebSocket clients.
@@ -251,4 +285,45 @@ func (s *Server) SetFileContent(content string) {
 	s.fileContentMu.Lock()
 	s.fileContent = content
 	s.fileContentMu.Unlock()
+}
+
+// GetMetadata returns a copy of the current metadata.
+func (s *Server) GetMetadata() *Metadata {
+	s.metadataMu.RLock()
+	defer s.metadataMu.RUnlock()
+
+	// Return a copy to avoid race conditions
+	copy := &Metadata{
+		Version:    s.metadata.Version,
+		SourceHash: s.metadata.SourceHash,
+		Positions:  make(map[string]NodeOffset),
+	}
+	for k, v := range s.metadata.Positions {
+		copy.Positions[k] = v
+	}
+	return copy
+}
+
+// SetNodePosition updates a node's position offset and saves metadata.
+func (s *Server) SetNodePosition(nodeID string, dx, dy float64) error {
+	s.metadataMu.Lock()
+	s.metadata.SetPosition(nodeID, dx, dy)
+	s.metadataMu.Unlock()
+
+	if s.FilePath != "" {
+		return SaveMetadata(s.FilePath, s.metadata)
+	}
+	return nil
+}
+
+// ClearAllPositions clears all position overrides.
+func (s *Server) ClearAllPositions() error {
+	s.metadataMu.Lock()
+	s.metadata.Positions = make(map[string]NodeOffset)
+	s.metadataMu.Unlock()
+
+	if s.FilePath != "" {
+		return SaveMetadata(s.FilePath, s.metadata)
+	}
+	return nil
 }

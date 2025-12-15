@@ -298,6 +298,16 @@
         let isPanning = false;
         let startX, startY;
 
+        // Node dragging state
+        let nodePositions = {};  // { nodeId: { dx, dy } }
+        let isDraggingNode = false;
+        let draggedNode = null;
+        let draggedNodeId = null;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let dragInitialDX = 0;
+        let dragInitialDY = 0;
+
         // DOM elements
         const statusDot = document.getElementById('statusDot');
         const statusText = document.getElementById('statusText');
@@ -430,6 +440,18 @@
                         downloadExport(msg.data, msg.format, msg.filename);
                         setExporting(false);
                         break;
+                    case 'positions':
+                        nodePositions = msg.positions || {};
+                        applyNodePositions();
+                        break;
+                    case 'positions-cleared':
+                        nodePositions = {};
+                        applyNodePositions();
+                        showToast('Positions reset', 'warning');
+                        break;
+                    case 'position-saved':
+                        // Position saved acknowledgment
+                        break;
                 }
             };
         }
@@ -539,8 +561,143 @@
             const svgEl = canvas.querySelector('svg');
             if (svgEl) {
                 updateTransform();
+                setupNodeDragging();
+                applyNodePositions();
             }
         }
+
+        // Base64 decode helper
+        function decodeBase64(str) {
+            try {
+                return atob(str);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        // Get node ID from SVG group element
+        function getNodeId(element) {
+            const className = element.getAttribute('class');
+            if (!className) return null;
+
+            // D2 uses base64-encoded node IDs as class names
+            // Only single-word classes (no spaces) are node IDs
+            const classes = className.split(/\s+/);
+            for (const cls of classes) {
+                // Skip known D2 classes
+                if (cls.startsWith('d2-') || cls === 'shape' || cls === 'connection') continue;
+
+                const decoded = decodeBase64(cls);
+                if (decoded && !decoded.includes(' ') && decoded.length > 0) {
+                    // Looks like a valid node ID
+                    return decoded;
+                }
+            }
+            return null;
+        }
+
+        // Find all draggable nodes in SVG
+        function findDraggableNodes() {
+            const svgEl = canvas.querySelector('svg');
+            if (!svgEl) return [];
+
+            const nodes = [];
+            // Find all direct children g elements with base64 class names
+            const groups = svgEl.querySelectorAll('g');
+            for (const g of groups) {
+                const nodeId = getNodeId(g);
+                // Only top-level node groups (has shape child, not a connection)
+                if (nodeId && g.querySelector('.shape') && !nodeId.startsWith('(')) {
+                    nodes.push({ element: g, nodeId });
+                }
+            }
+            return nodes;
+        }
+
+        // Set up drag handlers on nodes
+        function setupNodeDragging() {
+            const nodes = findDraggableNodes();
+            for (const { element, nodeId } of nodes) {
+                element.style.cursor = 'move';
+
+                element.addEventListener('mousedown', (e) => {
+                    if (e.button !== 0) return;
+                    e.stopPropagation(); // Prevent canvas panning
+
+                    isDraggingNode = true;
+                    draggedNode = element;
+                    draggedNodeId = nodeId;
+
+                    // Get current position offset
+                    const pos = nodePositions[nodeId] || { dx: 0, dy: 0 };
+                    dragInitialDX = pos.dx;
+                    dragInitialDY = pos.dy;
+
+                    // Store start position (account for zoom)
+                    dragStartX = e.clientX;
+                    dragStartY = e.clientY;
+
+                    element.style.opacity = '0.8';
+                });
+            }
+        }
+
+        // Apply stored positions to nodes
+        function applyNodePositions() {
+            const nodes = findDraggableNodes();
+            for (const { element, nodeId } of nodes) {
+                const pos = nodePositions[nodeId];
+                if (pos) {
+                    element.style.transform = `translate(${pos.dx}px, ${pos.dy}px)`;
+                } else {
+                    element.style.transform = '';
+                }
+            }
+        }
+
+        // Global mouse move handler for node dragging
+        document.addEventListener('mousemove', (e) => {
+            if (!isDraggingNode || !draggedNode) return;
+
+            // Calculate delta (account for zoom)
+            const dx = (e.clientX - dragStartX) / zoom;
+            const dy = (e.clientY - dragStartY) / zoom;
+
+            // Apply transform
+            const newDX = dragInitialDX + dx;
+            const newDY = dragInitialDY + dy;
+            draggedNode.style.transform = `translate(${newDX}px, ${newDY}px)`;
+        });
+
+        // Global mouse up handler for node dragging
+        document.addEventListener('mouseup', (e) => {
+            if (!isDraggingNode || !draggedNode) return;
+
+            // Calculate final delta
+            const dx = (e.clientX - dragStartX) / zoom;
+            const dy = (e.clientY - dragStartY) / zoom;
+            const finalDX = dragInitialDX + dx;
+            const finalDY = dragInitialDY + dy;
+
+            // Store position locally
+            nodePositions[draggedNodeId] = { dx: finalDX, dy: finalDY };
+
+            // Send to server
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'position',
+                    nodeId: draggedNodeId,
+                    dx: finalDX,
+                    dy: finalDY
+                }));
+            }
+
+            // Reset state
+            draggedNode.style.opacity = '';
+            isDraggingNode = false;
+            draggedNode = null;
+            draggedNodeId = null;
+        });
 
         function showError(error) {
             // Parse error to highlight line numbers
@@ -606,7 +763,7 @@
 
         // Pan controls
         canvas.addEventListener('mousedown', (e) => {
-            if (e.button === 0) {
+            if (e.button === 0 && !isDraggingNode) {
                 isPanning = true;
                 startX = e.clientX - panX;
                 startY = e.clientY - panY;
@@ -615,7 +772,7 @@
         });
 
         canvas.addEventListener('mousemove', (e) => {
-            if (isPanning) {
+            if (isPanning && !isDraggingNode) {
                 panX = e.clientX - startX;
                 panY = e.clientY - startY;
                 updateTransform();
@@ -623,13 +780,17 @@
         });
 
         canvas.addEventListener('mouseup', () => {
-            isPanning = false;
-            canvas.classList.remove('dragging');
+            if (!isDraggingNode) {
+                isPanning = false;
+                canvas.classList.remove('dragging');
+            }
         });
 
         canvas.addEventListener('mouseleave', () => {
-            isPanning = false;
-            canvas.classList.remove('dragging');
+            if (!isDraggingNode) {
+                isPanning = false;
+                canvas.classList.remove('dragging');
+            }
         });
 
         // Mouse wheel zoom

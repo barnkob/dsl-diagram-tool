@@ -129,6 +129,12 @@ type WSMessage struct {
 	Format   string `json:"format,omitempty"`   // For export: svg, png, pdf
 	Data     string `json:"data,omitempty"`     // For export: base64-encoded content
 	Filename string `json:"filename,omitempty"` // For export: suggested filename
+
+	// Position-related fields
+	NodeID    string                 `json:"nodeId,omitempty"`    // For position: node identifier
+	DX        float64                `json:"dx,omitempty"`        // For position: x offset
+	DY        float64                `json:"dy,omitempty"`        // For position: y offset
+	Positions map[string]NodeOffset  `json:"positions,omitempty"` // For positions: all offsets
 }
 
 // handleWebSocket handles WebSocket connections.
@@ -155,6 +161,15 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		conn.WriteJSON(WSMessage{
 			Type:   "file-changed",
 			Source: s.GetFileContent(),
+		})
+	}
+
+	// Send initial positions
+	meta := s.GetMetadata()
+	if meta.HasPositions() {
+		conn.WriteJSON(WSMessage{
+			Type:      "positions",
+			Positions: meta.Positions,
 		})
 	}
 
@@ -265,6 +280,45 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 				Format:   format,
 				Data:     base64.StdEncoding.EncodeToString(outputBytes),
 				Filename: filename,
+			})
+
+		case "position":
+			// Update node position
+			if msg.NodeID == "" {
+				conn.WriteJSON(WSMessage{
+					Type:  "error",
+					Error: "nodeId is required",
+				})
+				continue
+			}
+
+			if err := s.SetNodePosition(msg.NodeID, msg.DX, msg.DY); err != nil {
+				conn.WriteJSON(WSMessage{
+					Type:  "error",
+					Error: "Failed to save position: " + err.Error(),
+				})
+				continue
+			}
+
+			// Acknowledge position saved
+			conn.WriteJSON(WSMessage{
+				Type:   "position-saved",
+				NodeID: msg.NodeID,
+			})
+
+		case "clear-positions":
+			// Clear all positions
+			if err := s.ClearAllPositions(); err != nil {
+				conn.WriteJSON(WSMessage{
+					Type:  "error",
+					Error: "Failed to clear positions: " + err.Error(),
+				})
+				continue
+			}
+
+			// Broadcast to all clients
+			s.broadcast(WSMessage{
+				Type: "positions-cleared",
 			})
 		}
 	}
