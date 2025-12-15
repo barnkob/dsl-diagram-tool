@@ -175,7 +175,7 @@ func (r *PDFRenderer) RenderToBytes(ctx context.Context, diagram *ir.Diagram) ([
 	}
 
 	// Convert SVG to PDF using headless Chrome
-	return svgToPDF(ctx, svgBytes)
+	return SVGToPDF(ctx, svgBytes)
 }
 
 // Render renders the diagram to PNG format.
@@ -198,13 +198,13 @@ func (r *PNGRenderer) RenderToBytes(ctx context.Context, diagram *ir.Diagram) ([
 	}
 
 	// Convert SVG to PNG using headless Chrome with specified pixel density
-	return svgToPNG(ctx, svgBytes, r.Options.PixelDensity)
+	return SVGToPNG(ctx, svgBytes, r.Options.PixelDensity)
 }
 
-// svgToPNG converts SVG bytes to PNG using headless Chrome via chromedp.
+// SVGToPNG converts SVG bytes to PNG using headless Chrome via chromedp.
 // This ensures proper font rendering since Chrome handles all fonts natively.
 // The pixelDensity parameter controls the device scale factor (2 = retina, 3 = higher DPI).
-func svgToPNG(ctx context.Context, svgBytes []byte, pixelDensity int) ([]byte, error) {
+func SVGToPNG(ctx context.Context, svgBytes []byte, pixelDensity int) ([]byte, error) {
 	// Ensure minimum pixel density of 1
 	if pixelDensity < 1 {
 		pixelDensity = 1
@@ -248,10 +248,10 @@ func svgToPNG(ctx context.Context, svgBytes []byte, pixelDensity int) ([]byte, e
 	return pngBytes, nil
 }
 
-// svgToPDF converts SVG bytes to PDF using headless Chrome via chromedp.
+// SVGToPDF converts SVG bytes to PDF using headless Chrome via chromedp.
 // This ensures proper font rendering and maintains vector quality since Chrome
 // handles all rendering natively and outputs PDF with embedded fonts.
-func svgToPDF(ctx context.Context, svgBytes []byte) ([]byte, error) {
+func SVGToPDF(ctx context.Context, svgBytes []byte) ([]byte, error) {
 	// Create a data URI for the SVG
 	dataURI := "data:image/svg+xml;base64," + base64.StdEncoding.EncodeToString(svgBytes)
 

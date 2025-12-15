@@ -2,10 +2,13 @@ package server
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mark/dsl-diagram-tool/pkg/render"
@@ -119,10 +122,13 @@ func (s *Server) handleFilePut(w http.ResponseWriter, r *http.Request) {
 
 // WSMessage represents a WebSocket message.
 type WSMessage struct {
-	Type   string `json:"type"`
-	Source string `json:"source,omitempty"`
-	SVG    string `json:"svg,omitempty"`
-	Error  string `json:"error,omitempty"`
+	Type     string `json:"type"`
+	Source   string `json:"source,omitempty"`
+	SVG      string `json:"svg,omitempty"`
+	Error    string `json:"error,omitempty"`
+	Format   string `json:"format,omitempty"`   // For export: svg, png, pdf
+	Data     string `json:"data,omitempty"`     // For export: base64-encoded content
+	Filename string `json:"filename,omitempty"` // For export: suggested filename
 }
 
 // handleWebSocket handles WebSocket connections.
@@ -195,6 +201,71 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			} else {
 				conn.WriteJSON(WSMessage{Type: "saved"})
 			}
+
+		case "export":
+			format := msg.Format
+			if format == "" {
+				format = "svg"
+			}
+
+			// Validate format
+			if format != "svg" && format != "png" && format != "pdf" {
+				conn.WriteJSON(WSMessage{
+					Type:  "error",
+					Error: "Invalid format: must be svg, png, or pdf",
+				})
+				continue
+			}
+
+			// Generate filename from file path
+			filename := "diagram." + format
+			if s.FilePath != "" {
+				base := filepath.Base(s.FilePath)
+				ext := filepath.Ext(base)
+				filename = strings.TrimSuffix(base, ext) + "." + format
+			}
+
+			// Render to SVG first
+			svgBytes, err := renderD2(r.Context(), msg.Source, nil)
+			if err != nil {
+				conn.WriteJSON(WSMessage{
+					Type:  "error",
+					Error: err.Error(),
+				})
+				continue
+			}
+
+			var outputBytes []byte
+			switch format {
+			case "svg":
+				outputBytes = svgBytes
+			case "png":
+				outputBytes, err = render.SVGToPNG(r.Context(), svgBytes, 3)
+				if err != nil {
+					conn.WriteJSON(WSMessage{
+						Type:  "error",
+						Error: "PNG rendering failed: " + err.Error(),
+					})
+					continue
+				}
+			case "pdf":
+				outputBytes, err = render.SVGToPDF(r.Context(), svgBytes)
+				if err != nil {
+					conn.WriteJSON(WSMessage{
+						Type:  "error",
+						Error: "PDF rendering failed: " + err.Error(),
+					})
+					continue
+				}
+			}
+
+			// Send exported data as base64
+			conn.WriteJSON(WSMessage{
+				Type:     "exported",
+				Format:   format,
+				Data:     base64.StdEncoding.EncodeToString(outputBytes),
+				Filename: filename,
+			})
 		}
 	}
 }

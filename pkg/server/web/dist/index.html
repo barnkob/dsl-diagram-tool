@@ -246,6 +246,10 @@
             </div>
             <div class="toolbar">
                 <button id="saveBtn" disabled>Save (Ctrl+S)</button>
+                <span style="border-left: 1px solid #555; height: 20px; margin: 0 4px;"></span>
+                <button id="exportSvgBtn" class="secondary" onclick="exportDiagram('svg')">SVG</button>
+                <button id="exportPngBtn" class="secondary" onclick="exportDiagram('png')">PNG</button>
+                <button id="exportPdfBtn" class="secondary" onclick="exportDiagram('pdf')">PDF</button>
             </div>
             <div id="editor"></div>
         </div>
@@ -283,6 +287,7 @@
         let ws;
         let debounceTimer;
         let isDirty = false;
+        let isExporting = false;
         let pendingExternalContent = null;
         const DEBOUNCE_DELAY = 300;
 
@@ -306,6 +311,9 @@
         const fileChangedBanner = document.getElementById('fileChangedBanner');
         const editorPane = document.getElementById('editorPane');
         const resizer = document.getElementById('resizer');
+        const exportSvgBtn = document.getElementById('exportSvgBtn');
+        const exportPngBtn = document.getElementById('exportPngBtn');
+        const exportPdfBtn = document.getElementById('exportPdfBtn');
 
         // Initialize Monaco Editor
         require(['vs/editor/editor.main'], function () {
@@ -408,6 +416,7 @@
                         break;
                     case 'error':
                         showError(msg.error);
+                        setExporting(false);
                         break;
                     case 'file-changed':
                         handleFileChanged(msg.source);
@@ -416,6 +425,10 @@
                         isDirty = false;
                         saveBtn.disabled = true;
                         showToast('Saved', 'success');
+                        break;
+                    case 'exported':
+                        downloadExport(msg.data, msg.format, msg.filename);
+                        setExporting(false);
                         break;
                 }
             };
@@ -461,6 +474,64 @@
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
             const source = editor.getValue();
             ws.send(JSON.stringify({ type: 'save', source }));
+        }
+
+        function setExporting(state) {
+            isExporting = state;
+            exportSvgBtn.disabled = state;
+            exportPngBtn.disabled = state;
+            exportPdfBtn.disabled = state;
+            if (state) {
+                exportSvgBtn.textContent = 'SVG';
+                exportPngBtn.textContent = 'PNG';
+                exportPdfBtn.textContent = 'PDF';
+            }
+        }
+
+        function exportDiagram(format) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                showToast('Not connected', 'warning');
+                return;
+            }
+            if (isExporting) return;
+
+            setExporting(true);
+            const btn = format === 'svg' ? exportSvgBtn : format === 'png' ? exportPngBtn : exportPdfBtn;
+            btn.textContent = 'Exporting...';
+
+            const source = editor.getValue();
+            ws.send(JSON.stringify({ type: 'export', source, format }));
+        }
+
+        function downloadExport(base64Data, format, filename) {
+            try {
+                const binaryString = atob(base64Data);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+
+                const mimeTypes = {
+                    'svg': 'image/svg+xml',
+                    'png': 'image/png',
+                    'pdf': 'application/pdf'
+                };
+
+                const blob = new Blob([bytes], { type: mimeTypes[format] });
+                const url = URL.createObjectURL(blob);
+
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                showToast('Downloaded ' + filename, 'success');
+            } catch (err) {
+                showToast('Download failed: ' + err.message, 'warning');
+            }
         }
 
         function showSVG(svg) {
