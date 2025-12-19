@@ -1,8 +1,8 @@
-# Session Notes: WP34 Drag-Drop & Waypoints
+# Session Notes: WP34 Drag-Drop & Vertices
 
-**Date:** 2025-12-16
-**Branch:** `wp34-drag-drop`
-**Status:** In Progress
+**Date:** 2025-12-16 (updated 2025-12-19)
+**Branch:** `wp34-drag-drop` → `poc-jointjs`
+**Status:** Completed - Migrated to JointJS
 
 ## What Was Accomplished
 

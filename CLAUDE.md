@@ -84,7 +84,7 @@ The browser editor uses [JointJS](https://www.jointjs.com/) for diagram renderin
 
 ### Vertices (Edge Bend Points)
 
-Design inspired by [Structurizr's diagram editor](https://docs.structurizr.com/ui/diagrams/editor).
+Design inspired by [Structurizr's diagram editor](https://docs.structurizr.com/ui/diagrams/editor). See `docs/DESIGN-vertices.md` for full details.
 
 **Architecture:**
 - Vertices stored in `.d2meta` files (not in D2 source)
@@ -92,8 +92,8 @@ Design inspired by [Structurizr's diagram editor](https://docs.structurizr.com/u
 - Edge IDs normalized to handle HTML entity encoding
 
 **Key Files:**
-- `pkg/server/metadata.go` - `Metadata` struct with `Vertices` and `RoutingMode` maps
-- `pkg/server/handlers.go` - WebSocket messages: `vertices`, `routing`, `positions`
+- `pkg/server/metadata.go` - `Metadata` struct with `Vertices` map
+- `pkg/server/handlers.go` - WebSocket messages: `vertices`, `positions`
 - `pkg/server/web/dist/index.html` - JointJS-based frontend
 
 **Interaction Model:**
@@ -102,6 +102,7 @@ Design inspired by [Structurizr's diagram editor](https://docs.structurizr.com/u
 - Drag vertex circles to bend the edge
 - Double-click vertex to remove it
 - Drag nodes to reposition them
+- Click empty canvas to deselect
 
 ## Current Status
 

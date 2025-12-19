@@ -367,20 +367,27 @@
                 defaultConnector: { name: 'rounded', args: { radius: 5 } }
             });
 
-            // Handle link vertex changes
+            // Handle link vertex changes (add, move, remove)
             graph.on('change:vertices', (link, vertices) => {
                 const edgeId = link.get('edgeId');
                 if (!edgeId) return;
 
+                // Update local state
+                if (vertices && vertices.length > 0) {
+                    edgeVertices[edgeId] = vertices;
+                } else {
+                    delete edgeVertices[edgeId];
+                }
+
                 // Update debug panel
-                updateDebug(`Vertices changed on ${edgeId}: ${vertices.length} vertices`);
+                updateDebug(`Vertices changed on ${edgeId}: ${vertices ? vertices.length : 0} vertices`);
 
                 // Send to server (using 'vertices' message type)
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({
                         type: 'vertices',
                         edgeId: edgeId,
-                        vertices: vertices
+                        vertices: vertices || []
                     }));
                 }
             });
@@ -429,13 +436,14 @@
                     }
                 });
 
-                // Add tools to clicked link (vertices only, no delete)
+                // Add tools to clicked link (vertices only, no link delete)
                 const tools = new joint.dia.ToolsView({
                     tools: [
                         new joint.linkTools.Vertices({
                             snapRadius: 10,
                             redundancyRemoval: false,
-                            vertexAdding: true
+                            vertexAdding: true,
+                            vertexRemoving: true  // Double-click to remove vertex
                         })
                     ]
                 });
