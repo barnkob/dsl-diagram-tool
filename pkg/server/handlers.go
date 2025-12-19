@@ -135,6 +135,15 @@ type WSMessage struct {
 	DX        float64                `json:"dx,omitempty"`        // For position: x offset
 	DY        float64                `json:"dy,omitempty"`        // For position: y offset
 	Positions map[string]NodeOffset  `json:"positions,omitempty"` // For positions: all offsets
+
+	// Waypoint-related fields
+	EdgeID        string                   `json:"edgeId,omitempty"`       // For waypoints: edge identifier
+	EdgeWaypoints []EdgePoint              `json:"waypoints,omitempty"`    // For waypoints: single edge waypoints
+	AllWaypoints  map[string][]EdgePoint   `json:"allWaypoints,omitempty"` // For waypoints: all edge waypoints
+
+	// Routing mode fields
+	RoutingMode    string            `json:"routingMode,omitempty"`    // For routing: edge routing mode (direct, orthogonal)
+	AllRoutingMode map[string]string `json:"allRoutingMode,omitempty"` // For positions: all routing modes
 }
 
 // handleWebSocket handles WebSocket connections.
@@ -164,12 +173,14 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	// Send initial positions
+	// Send initial positions, waypoints, and routing modes
 	meta := s.GetMetadata()
-	if meta.HasPositions() {
+	if meta.HasPositions() || meta.HasWaypoints() || meta.HasRoutingModes() {
 		conn.WriteJSON(WSMessage{
-			Type:      "positions",
-			Positions: meta.Positions,
+			Type:           "positions",
+			Positions:      meta.Positions,
+			AllWaypoints:   meta.Waypoints,
+			AllRoutingMode: meta.RoutingMode,
 		})
 	}
 
@@ -306,8 +317,57 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 				NodeID: msg.NodeID,
 			})
 
+		case "waypoints":
+			// Update edge waypoints
+			if msg.EdgeID == "" {
+				conn.WriteJSON(WSMessage{
+					Type:  "error",
+					Error: "edgeId is required",
+				})
+				continue
+			}
+
+			if err := s.SetEdgeWaypoints(msg.EdgeID, msg.EdgeWaypoints); err != nil {
+				conn.WriteJSON(WSMessage{
+					Type:  "error",
+					Error: "Failed to save waypoints: " + err.Error(),
+				})
+				continue
+			}
+
+			// Acknowledge waypoints saved
+			conn.WriteJSON(WSMessage{
+				Type:   "waypoints-saved",
+				EdgeID: msg.EdgeID,
+			})
+
+		case "routing":
+			// Update edge routing mode
+			if msg.EdgeID == "" {
+				conn.WriteJSON(WSMessage{
+					Type:  "error",
+					Error: "edgeId is required",
+				})
+				continue
+			}
+
+			if err := s.SetRoutingMode(msg.EdgeID, msg.RoutingMode); err != nil {
+				conn.WriteJSON(WSMessage{
+					Type:  "error",
+					Error: "Failed to save routing mode: " + err.Error(),
+				})
+				continue
+			}
+
+			// Acknowledge routing mode saved
+			conn.WriteJSON(WSMessage{
+				Type:        "routing-saved",
+				EdgeID:      msg.EdgeID,
+				RoutingMode: msg.RoutingMode,
+			})
+
 		case "clear-positions":
-			// Clear all positions
+			// Clear all positions and waypoints
 			if err := s.ClearAllPositions(); err != nil {
 				conn.WriteJSON(WSMessage{
 					Type:  "error",

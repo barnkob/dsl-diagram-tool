@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "positions": {
+    "backend": {
+      "dx": -4,
+      "dy": -6
+    },
+    "database": {
+      "dx": -165,
+      "dy": 64
+    }
+  },
+  "waypoints": {
+    "(backend -\u003e database)[0]": [
+      {
+        "x": 311.19189453125,
+        "y": 441.0278625488281
+      }
+    ]
+  },
+  "sourceHash": "a2ae3683f07a146f"
+}

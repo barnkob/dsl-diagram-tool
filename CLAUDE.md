@@ -30,10 +30,13 @@ pkg/              - Public packages
   layout/         - Layout engine integration
   render/         - Rendering to SVG/PNG/PDF
   metadata/       - Metadata layer for overrides
+  server/         - Browser-based editor server
+    web/dist/     - Frontend (single index.html)
 internal/         - Private packages
   config/         - Configuration management
 testdata/         - Test fixtures
 examples/         - Example diagrams
+docs/             - Design documentation
 ```
 
 ## Git Workflow
@@ -65,6 +68,35 @@ This project uses work packages (WP) for development:
 - See `DEVELOPMENT.md` for detailed development guide
 - Project planning docs: `~/storagebox/mark/pet-projects-ideas/Projects/DSL-Diagram-Tool.md`
 - Binary outputs to `bin/` (gitignored)
+
+## Browser Editor Features
+
+The tool includes a browser-based editor (`diagtool edit`) with interactive diagram manipulation.
+
+### Waypoints (Edge Routing)
+
+Design inspired by [Structurizr's diagram editor](https://docs.structurizr.com/ui/diagrams/editor). See `docs/DESIGN-waypoints.md` for full details.
+
+**Architecture:**
+- Waypoints stored in `.d2meta` files (not in D2 source)
+- Source hash validation clears waypoints when D2 source changes
+- Edge IDs normalized to handle HTML entity encoding
+
+**Key Files:**
+- `pkg/server/metadata.go` - `Metadata` struct with `Waypoints` and `RoutingMode` maps
+- `pkg/server/handlers.go` - WebSocket messages: `waypoints`, `routing`, `positions`
+- `pkg/server/web/dist/index.html` - Frontend with edge path calculation
+
+**Interaction Model:**
+- Click edge to add waypoint
+- Drag waypoint circle to move
+- Click X button to delete waypoint
+- Press 'R' while hovering edge to toggle routing mode (direct/orthogonal)
+- Press 'V' while hovering edge to add waypoint at cursor
+
+**Routing Modes:**
+- `direct` - Straight lines through waypoints (default)
+- `orthogonal` - Right-angle routing through waypoints
 
 ## Current Status
 

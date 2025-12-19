@@ -1,0 +1,13 @@
+# Simple nested container test
+
+outer: Outer Container {
+  inner1: Inner Box 1
+  inner2: Inner Box 2
+
+  inner1 -> inner2
+}
+
+# External node
+external: External Node
+
+external -> outer.inner1

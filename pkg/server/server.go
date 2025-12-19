@@ -293,15 +293,26 @@ func (s *Server) GetMetadata() *Metadata {
 	defer s.metadataMu.RUnlock()
 
 	// Return a copy to avoid race conditions
-	copy := &Metadata{
-		Version:    s.metadata.Version,
-		SourceHash: s.metadata.SourceHash,
-		Positions:  make(map[string]NodeOffset),
+	metaCopy := &Metadata{
+		Version:     s.metadata.Version,
+		SourceHash:  s.metadata.SourceHash,
+		Positions:   make(map[string]NodeOffset),
+		Waypoints:   make(map[string][]EdgePoint),
+		RoutingMode: make(map[string]string),
 	}
 	for k, v := range s.metadata.Positions {
-		copy.Positions[k] = v
+		metaCopy.Positions[k] = v
 	}
-	return copy
+	for k, v := range s.metadata.Waypoints {
+		// Deep copy waypoints slice
+		waypointsCopy := make([]EdgePoint, len(v))
+		copy(waypointsCopy, v)
+		metaCopy.Waypoints[k] = waypointsCopy
+	}
+	for k, v := range s.metadata.RoutingMode {
+		metaCopy.RoutingMode[k] = v
+	}
+	return metaCopy
 }
 
 // SetNodePosition updates a node's position offset and saves metadata.
@@ -316,10 +327,36 @@ func (s *Server) SetNodePosition(nodeID string, dx, dy float64) error {
 	return nil
 }
 
-// ClearAllPositions clears all position overrides.
+// ClearAllPositions clears all position overrides, waypoints, and routing modes.
 func (s *Server) ClearAllPositions() error {
 	s.metadataMu.Lock()
 	s.metadata.Positions = make(map[string]NodeOffset)
+	s.metadata.Waypoints = make(map[string][]EdgePoint)
+	s.metadata.RoutingMode = make(map[string]string)
+	s.metadataMu.Unlock()
+
+	if s.FilePath != "" {
+		return SaveMetadata(s.FilePath, s.metadata)
+	}
+	return nil
+}
+
+// SetEdgeWaypoints updates an edge's waypoints and saves metadata.
+func (s *Server) SetEdgeWaypoints(edgeID string, waypoints []EdgePoint) error {
+	s.metadataMu.Lock()
+	s.metadata.SetWaypoints(edgeID, waypoints)
+	s.metadataMu.Unlock()
+
+	if s.FilePath != "" {
+		return SaveMetadata(s.FilePath, s.metadata)
+	}
+	return nil
+}
+
+// SetRoutingMode updates an edge's routing mode and saves metadata.
+func (s *Server) SetRoutingMode(edgeID string, mode string) error {
+	s.metadataMu.Lock()
+	s.metadata.SetRoutingMode(edgeID, mode)
 	s.metadataMu.Unlock()
 
 	if s.FilePath != "" {

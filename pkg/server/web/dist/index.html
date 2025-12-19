@@ -95,6 +95,65 @@
         #canvas svg {
             transform-origin: 0 0;
         }
+        /* Edge waypoint styles */
+        .waypoint-group {
+            pointer-events: all;
+        }
+        .waypoint {
+            fill: #4a6ff3;
+            stroke: #fff;
+            stroke-width: 2;
+            cursor: move;
+            transition: fill 0.15s;
+        }
+        .waypoint:hover {
+            fill: #7b9df5;
+        }
+        .waypoint.dragging {
+            fill: #2d4fb8;
+        }
+        .waypoint.inactive {
+            fill: transparent;
+            stroke: #4a6ff3;
+            stroke-dasharray: 3 3;
+            opacity: 0.7;
+        }
+        .waypoint-delete {
+            fill: #e53935;
+            stroke: #fff;
+            stroke-width: 1.5;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.15s, fill 0.15s;
+        }
+        .waypoint-group:hover .waypoint-delete {
+            opacity: 1;
+        }
+        .waypoint-delete:hover {
+            fill: #ff6659;
+        }
+        .waypoint-delete-x {
+            stroke: #fff;
+            stroke-width: 2;
+            stroke-linecap: round;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .waypoint-group:hover .waypoint-delete-x {
+            opacity: 1;
+        }
+        .edge-clickable {
+            stroke: rgba(74, 111, 243, 0);
+            stroke-width: 20;
+            fill: none;
+            cursor: crosshair;
+            pointer-events: stroke;
+            transition: stroke 0.15s;
+        }
+        .edge-clickable:hover {
+            stroke: rgba(74, 111, 243, 0.2);
+        }
         .error-container {
             position: absolute;
             bottom: 0;
@@ -250,6 +309,8 @@
                 <button id="exportSvgBtn" class="secondary" onclick="exportDiagram('svg')">SVG</button>
                 <button id="exportPngBtn" class="secondary" onclick="exportDiagram('png')">PNG</button>
                 <button id="exportPdfBtn" class="secondary" onclick="exportDiagram('pdf')">PDF</button>
+                <span style="border-left: 1px solid #555; height: 20px; margin: 0 4px;"></span>
+                <button id="resetLayoutBtn" class="secondary" onclick="resetLayout()" title="Reset to D2 auto-layout">Reset Layout</button>
             </div>
             <div id="editor"></div>
         </div>
@@ -307,6 +368,17 @@
         let dragStartY = 0;
         let dragInitialDX = 0;
         let dragInitialDY = 0;
+
+        // Edge waypoint state
+        let edgeWaypoints = {};  // { edgeId: [{ x, y }, ...] }
+        let edgeRoutingMode = {};  // { edgeId: "direct"|"orthogonal" }
+        let isDraggingWaypoint = false;
+        let draggedWaypointEdgeId = null;
+        let draggedWaypointIndex = -1;
+        let waypointStartX = 0;
+        let waypointStartY = 0;
+        let hoveredEdgeId = null;  // Track which edge is being hovered for keyboard shortcuts
+        let lastMousePosition = { x: 0, y: 0 };  // Track mouse position for 'v' key
 
         // DOM elements
         const statusDot = document.getElementById('statusDot');
@@ -442,12 +514,30 @@
                         break;
                     case 'positions':
                         nodePositions = msg.positions || {};
+                        // Normalize waypoint keys and mark all loaded waypoints as active
+                        edgeWaypoints = {};
+                        for (const [key, value] of Object.entries(msg.allWaypoints || {})) {
+                            // Waypoints from server are always active
+                            edgeWaypoints[decodeHtmlEntities(key)] = value.map(wp => ({
+                                x: wp.x,
+                                y: wp.y,
+                                active: true
+                            }));
+                        }
+                        // Normalize routing mode keys
+                        edgeRoutingMode = {};
+                        for (const [key, value] of Object.entries(msg.allRoutingMode || {})) {
+                            edgeRoutingMode[decodeHtmlEntities(key)] = value;
+                        }
                         applyNodePositions();
                         break;
                     case 'positions-cleared':
                         nodePositions = {};
-                        applyNodePositions();
-                        showToast('Positions reset', 'warning');
+                        edgeWaypoints = {};
+                        edgeRoutingMode = {};
+                        // Re-render to restore original D2 layout
+                        render();
+                        showToast('Layout reset', 'success');
                         break;
                     case 'position-saved':
                         // Position saved acknowledgment
@@ -556,12 +646,23 @@
             }
         }
 
+        function resetLayout() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                showToast('Not connected', 'warning');
+                return;
+            }
+            // Clear all position overrides and edge waypoints
+            ws.send(JSON.stringify({ type: 'clear-positions' }));
+            // The server will broadcast 'positions-cleared' which triggers a re-render
+        }
+
         function showSVG(svg) {
             canvas.innerHTML = svg;
             const svgEl = canvas.querySelector('svg');
             if (svgEl) {
                 updateTransform();
                 setupNodeDragging();
+                setupEdgeWaypoints();
                 applyNodePositions();
             }
         }
@@ -574,6 +675,793 @@
                 return null;
             }
         }
+
+        // ============================================
+        // Edge Following Functions
+        // ============================================
+
+        // Find all edge groups in the SVG
+        function findAllEdges() {
+            const svg = canvas.querySelector('svg');
+            if (!svg) return [];
+
+            const edges = [];
+            const groups = svg.querySelectorAll('g');
+            for (const g of groups) {
+                const path = g.querySelector('path.connection');
+                if (path) {
+                    const className = g.getAttribute('class');
+                    if (className) {
+                        // Try each class to find the edge ID
+                        const classes = className.split(/\s+/);
+                        for (const cls of classes) {
+                            const decoded = decodeBase64(cls);
+                            // Edge IDs contain "(" and end with ")[index]"
+                            // Top-level: "(source -> target)[0]"
+                            // Nested: "prefix.(source -> target)[0]"
+                            if (decoded && decoded.includes('(') && /\)\[\d+\]$/.test(decoded)) {
+                                edges.push({ group: g, path, edgeId: decoded, originalPath: path.getAttribute('d') });
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            return edges;
+        }
+
+        // Decode HTML entities in a string
+        function decodeHtmlEntities(str) {
+            const textarea = document.createElement('textarea');
+            textarea.innerHTML = str;
+            return textarea.value;
+        }
+
+        // Parse edge ID to extract source and target node IDs
+        // Formats:
+        //   "(source -> target)[index]" - top-level edge
+        //   "prefix.(source -> target)[index]" - nested edge with container prefix
+        // Note: D2 encodes these with HTML entities (e.g., -&gt; instead of ->)
+        function parseEdgeId(edgeId) {
+            // First decode HTML entities
+            const decoded = decodeHtmlEntities(edgeId);
+
+            // Try to match with optional prefix: prefix.(source -> target)[index]
+            const match = decoded.match(/^(.*?)\((.+?)\s*(->|<-|<->|--)\s*(.+?)\)\[(\d+)\]$/);
+            if (!match) return null;
+
+            let prefix = match[1];
+            let source = match[2];
+            let target = match[4];
+            const direction = match[3];
+            const index = parseInt(match[5]);
+
+            // Remove trailing dot from prefix if present
+            if (prefix.endsWith('.')) {
+                prefix = prefix.slice(0, -1);
+            }
+
+            // Prepend prefix to get absolute node IDs
+            if (prefix) {
+                source = prefix + '.' + source;
+                target = prefix + '.' + target;
+            }
+
+            return {
+                source,
+                target,
+                direction,
+                index,
+                prefix: prefix || null
+            };
+        }
+
+        // Find all edges connected to a specific node
+        function findConnectedEdges(nodeId) {
+            return findAllEdges().filter(edge => {
+                const parsed = parseEdgeId(edge.edgeId);
+                return parsed && (parsed.source === nodeId || parsed.target === nodeId);
+            });
+        }
+
+        // Get the bounding box of a node (accounting for position offset)
+        function getNodeBounds(nodeId) {
+            const nodes = findDraggableNodes();
+            const node = nodes.find(n => n.nodeId === nodeId);
+            if (!node) return null;
+
+            // Get the shape element's bounding box
+            const shape = node.element.querySelector('.shape');
+            if (!shape) return null;
+
+            const bbox = shape.getBBox();
+            const offset = nodePositions[nodeId] || { dx: 0, dy: 0 };
+
+            return {
+                x: bbox.x + offset.dx,
+                y: bbox.y + offset.dy,
+                width: bbox.width,
+                height: bbox.height,
+                cx: bbox.x + bbox.width / 2 + offset.dx,
+                cy: bbox.y + bbox.height / 2 + offset.dy
+            };
+        }
+
+        // Calculate the intersection point of a line from center to target on a rectangle boundary
+        function getRectEdgePoint(bounds, targetX, targetY) {
+            const cx = bounds.cx;
+            const cy = bounds.cy;
+            const hw = bounds.width / 2;  // half width
+            const hh = bounds.height / 2; // half height
+
+            // Direction vector from center to target
+            const dx = targetX - cx;
+            const dy = targetY - cy;
+
+            // Handle case where target is at the same position
+            if (dx === 0 && dy === 0) {
+                return { x: cx, y: cy - hh }; // Default to top
+            }
+
+            // Calculate intersection with rectangle edges
+            // We need to find the parameter t where the line intersects the rectangle
+            let t = Infinity;
+
+            // Check intersection with each edge
+            if (dx !== 0) {
+                // Right edge (x = cx + hw)
+                const tRight = hw / Math.abs(dx);
+                // Left edge (x = cx - hw)
+                const tLeft = hw / Math.abs(dx);
+                t = Math.min(t, dx > 0 ? tRight : tLeft);
+            }
+            if (dy !== 0) {
+                // Bottom edge (y = cy + hh)
+                const tBottom = hh / Math.abs(dy);
+                // Top edge (y = cy - hh)
+                const tTop = hh / Math.abs(dy);
+                t = Math.min(t, dy > 0 ? tBottom : tTop);
+            }
+
+            // If direction is zero in one axis, t is already correct from the other axis
+            if (dx === 0) t = hh / Math.abs(dy);
+            if (dy === 0) t = hw / Math.abs(dx);
+
+            return {
+                x: cx + dx * t,
+                y: cy + dy * t
+            };
+        }
+
+        // Arrow marker offset - D2 arrows have refX=7 with width=10, so tip extends ~3-4px past path end
+        // We need to shorten the path so arrow tip lands on the node edge
+        const ARROW_OFFSET = 4;
+
+        // Shorten a point along a line by a given distance
+        function shortenPoint(point, towardX, towardY, distance) {
+            const dx = towardX - point.x;
+            const dy = towardY - point.y;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            if (len === 0) return point;
+
+            // Move point toward the target by 'distance'
+            return {
+                x: point.x + (dx / len) * distance,
+                y: point.y + (dy / len) * distance
+            };
+        }
+
+        // Calculate edge path between two nodes with proper edge anchoring
+        function calculateEdgePath(sourceBounds, targetBounds, hasSourceArrow, hasTargetArrow) {
+            // Get intersection points on the edge of each rectangle
+            let sourcePoint = getRectEdgePoint(sourceBounds, targetBounds.cx, targetBounds.cy);
+            let targetPoint = getRectEdgePoint(targetBounds, sourceBounds.cx, sourceBounds.cy);
+
+            // Shorten path to account for arrow markers
+            // Move target point inward so arrow tip lands on node edge
+            if (hasTargetArrow !== false) {
+                targetPoint = shortenPoint(targetPoint, sourceBounds.cx, sourceBounds.cy, ARROW_OFFSET);
+            }
+            // Move source point inward if there's a source arrow (bidirectional)
+            if (hasSourceArrow === true) {
+                sourcePoint = shortenPoint(sourcePoint, targetBounds.cx, targetBounds.cy, ARROW_OFFSET);
+            }
+
+            return `M ${sourcePoint.x} ${sourcePoint.y} L ${targetPoint.x} ${targetPoint.y}`;
+        }
+
+        // Determine arrow presence based on edge direction
+        // -> : target has arrow
+        // <- : source has arrow
+        // <-> : both have arrows
+        // -- : no arrows
+        function getArrowInfo(direction) {
+            switch (direction) {
+                case '->':
+                    return { hasSourceArrow: false, hasTargetArrow: true };
+                case '<-':
+                    return { hasSourceArrow: true, hasTargetArrow: false };
+                case '<->':
+                    return { hasSourceArrow: true, hasTargetArrow: true };
+                case '--':
+                    return { hasSourceArrow: false, hasTargetArrow: false };
+                default:
+                    return { hasSourceArrow: false, hasTargetArrow: true };
+            }
+        }
+
+        // Update all edges connected to a node
+        function updateConnectedEdges(nodeId) {
+            const connectedEdges = findConnectedEdges(nodeId);
+
+            for (const edge of connectedEdges) {
+                const parsed = parseEdgeId(edge.edgeId);
+                if (!parsed) continue;
+
+                // Skip self-referencing edges
+                if (parsed.source === parsed.target) continue;
+
+                const sourceBounds = getNodeBounds(parsed.source);
+                const targetBounds = getNodeBounds(parsed.target);
+
+                if (sourceBounds && targetBounds) {
+                    const arrowInfo = getArrowInfo(parsed.direction);
+                    const key = getEdgeKey(edge.edgeId);
+                    const waypoints = edgeWaypoints[key] || [];
+                    const routingMode = edgeRoutingMode[key] || 'direct';
+                    const newPath = calculateEdgePathWithWaypoints(
+                        sourceBounds, targetBounds, waypoints,
+                        arrowInfo.hasSourceArrow, arrowInfo.hasTargetArrow, routingMode
+                    );
+                    edge.path.setAttribute('d', newPath);
+
+                    // Update clickable overlay too
+                    const clickable = edge.group.querySelector('.edge-clickable');
+                    if (clickable) {
+                        clickable.setAttribute('d', newPath);
+                    }
+                }
+            }
+
+            // Re-render waypoints to update their positions
+            renderWaypoints();
+        }
+
+        // Update all edges in the diagram
+        function updateAllEdges() {
+            const allEdges = findAllEdges();
+            for (const edge of allEdges) {
+                const parsed = parseEdgeId(edge.edgeId);
+                if (!parsed) continue;
+
+                // Skip self-referencing edges
+                if (parsed.source === parsed.target) continue;
+
+                const sourceBounds = getNodeBounds(parsed.source);
+                const targetBounds = getNodeBounds(parsed.target);
+
+                if (sourceBounds && targetBounds) {
+                    const arrowInfo = getArrowInfo(parsed.direction);
+                    const key = getEdgeKey(edge.edgeId);
+                    const waypoints = edgeWaypoints[key] || [];
+                    const routingMode = edgeRoutingMode[key] || 'direct';
+                    const newPath = calculateEdgePathWithWaypoints(
+                        sourceBounds, targetBounds, waypoints,
+                        arrowInfo.hasSourceArrow, arrowInfo.hasTargetArrow, routingMode
+                    );
+                    edge.path.setAttribute('d', newPath);
+
+                    // Update clickable overlay too
+                    const clickable = edge.group.querySelector('.edge-clickable');
+                    if (clickable) {
+                        clickable.setAttribute('d', newPath);
+                    }
+                }
+            }
+
+            // Re-render waypoints to update their positions
+            renderWaypoints();
+        }
+
+        // Request a full re-render from the server to get proper D2 edge routing
+        function requestRerender() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            const source = editor.getValue();
+            ws.send(JSON.stringify({ type: 'render', source }));
+        }
+
+        // ============================================
+        // Edge Waypoint Functions
+        // ============================================
+
+        // Calculate edge path with waypoints, supporting different routing modes
+        function calculateEdgePathWithWaypoints(sourceBounds, targetBounds, waypoints, hasSourceArrow, hasTargetArrow, routingMode) {
+            routingMode = routingMode || 'direct';
+
+            // Filter to only include active waypoints for path calculation
+            const activeWaypoints = (waypoints || []).filter(wp => wp.active !== false);
+
+            if (routingMode === 'orthogonal') {
+                return calculateOrthogonalPath(sourceBounds, targetBounds, activeWaypoints, hasSourceArrow, hasTargetArrow);
+            }
+
+            // Default: direct (straight lines)
+            return calculateDirectPath(sourceBounds, targetBounds, activeWaypoints, hasSourceArrow, hasTargetArrow);
+        }
+
+        // Calculate direct (straight line) path through waypoints
+        function calculateDirectPath(sourceBounds, targetBounds, waypoints, hasSourceArrow, hasTargetArrow) {
+            if (!waypoints || waypoints.length === 0) {
+                return calculateEdgePath(sourceBounds, targetBounds, hasSourceArrow, hasTargetArrow);
+            }
+
+            // Get first waypoint to calculate source intersection
+            const firstWaypoint = waypoints[0];
+            let sourcePoint = getRectEdgePoint(sourceBounds, firstWaypoint.x, firstWaypoint.y);
+            if (hasSourceArrow) {
+                sourcePoint = shortenPoint(sourcePoint, firstWaypoint.x, firstWaypoint.y, ARROW_OFFSET);
+            }
+
+            // Get last waypoint to calculate target intersection
+            const lastWaypoint = waypoints[waypoints.length - 1];
+            let targetPoint = getRectEdgePoint(targetBounds, lastWaypoint.x, lastWaypoint.y);
+            if (hasTargetArrow !== false) {
+                targetPoint = shortenPoint(targetPoint, lastWaypoint.x, lastWaypoint.y, ARROW_OFFSET);
+            }
+
+            // Build path: source -> waypoints -> target
+            let path = `M ${sourcePoint.x} ${sourcePoint.y}`;
+            for (const wp of waypoints) {
+                path += ` L ${wp.x} ${wp.y}`;
+            }
+            path += ` L ${targetPoint.x} ${targetPoint.y}`;
+
+            return path;
+        }
+
+        // Calculate orthogonal (right-angle) path through waypoints
+        function calculateOrthogonalPath(sourceBounds, targetBounds, waypoints, hasSourceArrow, hasTargetArrow) {
+            // Determine first target point for source exit direction
+            const firstTarget = (waypoints && waypoints.length > 0)
+                ? waypoints[0]
+                : { x: targetBounds.cx, y: targetBounds.cy };
+
+            // Calculate source exit point (prefer horizontal/vertical exit)
+            let sourcePoint = getOrthogonalExitPoint(sourceBounds, firstTarget);
+            if (hasSourceArrow) {
+                // Shorten along the exit direction
+                const exitDir = getExitDirection(sourceBounds, sourcePoint);
+                sourcePoint = shortenPointOrthogonal(sourcePoint, exitDir, ARROW_OFFSET);
+            }
+
+            // Determine last source point for target entry direction
+            const lastSource = (waypoints && waypoints.length > 0)
+                ? waypoints[waypoints.length - 1]
+                : sourcePoint;
+
+            // Calculate target entry point
+            let targetPoint = getOrthogonalExitPoint(targetBounds, lastSource);
+            if (hasTargetArrow !== false) {
+                const entryDir = getExitDirection(targetBounds, targetPoint);
+                targetPoint = shortenPointOrthogonal(targetPoint, entryDir, ARROW_OFFSET);
+            }
+
+            // Build path with orthogonal segments
+            const points = [sourcePoint];
+
+            // Add intermediate points for orthogonal routing between waypoints
+            let prevPoint = sourcePoint;
+            for (const wp of (waypoints || [])) {
+                // Add orthogonal bend point(s) between prevPoint and waypoint
+                const bendPoints = getOrthogonalBendPoints(prevPoint, wp);
+                points.push(...bendPoints);
+                points.push(wp);
+                prevPoint = wp;
+            }
+
+            // Add final orthogonal segments to target
+            const finalBends = getOrthogonalBendPoints(prevPoint, targetPoint);
+            points.push(...finalBends);
+            points.push(targetPoint);
+
+            // Build SVG path
+            let path = `M ${points[0].x} ${points[0].y}`;
+            for (let i = 1; i < points.length; i++) {
+                path += ` L ${points[i].x} ${points[i].y}`;
+            }
+
+            return path;
+        }
+
+        // Get orthogonal exit point from a node bounds
+        function getOrthogonalExitPoint(bounds, target) {
+            const cx = bounds.cx, cy = bounds.cy;
+            const hw = bounds.width / 2, hh = bounds.height / 2;
+
+            // Determine primary direction to target
+            const dx = target.x - cx;
+            const dy = target.y - cy;
+
+            // Choose exit side based on which direction is dominant
+            if (Math.abs(dx) > Math.abs(dy)) {
+                // Horizontal dominant - exit from left or right
+                if (dx > 0) {
+                    return { x: cx + hw, y: cy }; // right
+                } else {
+                    return { x: cx - hw, y: cy }; // left
+                }
+            } else {
+                // Vertical dominant - exit from top or bottom
+                if (dy > 0) {
+                    return { x: cx, y: cy + hh }; // bottom
+                } else {
+                    return { x: cx, y: cy - hh }; // top
+                }
+            }
+        }
+
+        // Get exit direction from a bounds given an exit point
+        function getExitDirection(bounds, exitPoint) {
+            const cx = bounds.cx, cy = bounds.cy;
+            if (Math.abs(exitPoint.x - cx) > Math.abs(exitPoint.y - cy)) {
+                return exitPoint.x > cx ? 'right' : 'left';
+            } else {
+                return exitPoint.y > cy ? 'down' : 'up';
+            }
+        }
+
+        // Shorten a point along an orthogonal direction
+        function shortenPointOrthogonal(point, direction, offset) {
+            switch (direction) {
+                case 'right': return { x: point.x - offset, y: point.y };
+                case 'left': return { x: point.x + offset, y: point.y };
+                case 'down': return { x: point.x, y: point.y - offset };
+                case 'up': return { x: point.x, y: point.y + offset };
+                default: return point;
+            }
+        }
+
+        // Get bend points for orthogonal routing between two points
+        function getOrthogonalBendPoints(from, to) {
+            // If already aligned, no bend needed
+            if (Math.abs(from.x - to.x) < 1 || Math.abs(from.y - to.y) < 1) {
+                return [];
+            }
+
+            // Create one bend point (L-shaped path)
+            // Prefer horizontal-then-vertical or vertical-then-horizontal based on distance
+            const midX = (from.x + to.x) / 2;
+            const midY = (from.y + to.y) / 2;
+
+            // Use midpoint strategy for cleaner routing
+            if (Math.abs(from.x - to.x) > Math.abs(from.y - to.y)) {
+                // Horizontal dominant: go horizontal first, then vertical
+                return [{ x: midX, y: from.y }, { x: midX, y: to.y }];
+            } else {
+                // Vertical dominant: go vertical first, then horizontal
+                return [{ x: from.x, y: midY }, { x: to.x, y: midY }];
+            }
+        }
+
+        // Get the edge ID key for waypoints storage (normalized)
+        // Normalizes by decoding HTML entities so keys match consistently
+        function getEdgeKey(edgeId) {
+            return decodeHtmlEntities(edgeId);
+        }
+
+        // Setup clickable edges and waypoints after SVG is rendered
+        function setupEdgeWaypoints() {
+            const allEdges = findAllEdges();
+
+            for (const edge of allEdges) {
+                // Add clickable overlay for adding waypoints
+                const clickable = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                clickable.setAttribute('class', 'edge-clickable');
+                clickable.setAttribute('d', edge.path.getAttribute('d'));
+                clickable.dataset.edgeId = edge.edgeId;
+
+                // Double-click to add waypoint (Structurizr-style)
+                clickable.addEventListener('dblclick', (e) => {
+                    e.stopPropagation();
+                    const svg = canvas.querySelector('svg');
+                    const pt = svg.createSVGPoint();
+                    pt.x = e.clientX;
+                    pt.y = e.clientY;
+                    // getScreenCTM().inverse() already converts to SVG coordinate space
+                    const svgPt = pt.matrixTransform(svg.getScreenCTM().inverse());
+
+                    addWaypoint(edge.edgeId, svgPt.x, svgPt.y);
+                });
+
+                // Track hovered edge for keyboard shortcuts
+                clickable.addEventListener('mouseenter', () => {
+                    hoveredEdgeId = edge.edgeId;
+                });
+                clickable.addEventListener('mouseleave', () => {
+                    if (hoveredEdgeId === edge.edgeId) {
+                        hoveredEdgeId = null;
+                    }
+                });
+                // Track mouse position for 'v' key
+                clickable.addEventListener('mousemove', (e) => {
+                    const svg = canvas.querySelector('svg');
+                    const pt = svg.createSVGPoint();
+                    pt.x = e.clientX;
+                    pt.y = e.clientY;
+                    // getScreenCTM().inverse() already converts to SVG coordinate space
+                    const svgPt = pt.matrixTransform(svg.getScreenCTM().inverse());
+                    lastMousePosition.x = svgPt.x;
+                    lastMousePosition.y = svgPt.y;
+                });
+
+                // Insert AFTER the path so it's on top and can receive click events
+                edge.group.appendChild(clickable);
+            }
+
+            // Render existing waypoints
+            renderWaypoints();
+        }
+
+        // Add a waypoint to an edge
+        function addWaypoint(edgeId, x, y) {
+            const key = getEdgeKey(edgeId);
+            if (!edgeWaypoints[key]) {
+                edgeWaypoints[key] = [];
+            }
+
+            // Find the best position to insert the waypoint
+            const waypoints = edgeWaypoints[key];
+            let insertIndex = waypoints.length; // Default: append at end
+
+            if (waypoints.length > 0) {
+                // Find which segment the click is closest to
+                const parsed = parseEdgeId(edgeId);
+                if (parsed) {
+                    const sourceBounds = getNodeBounds(parsed.source);
+                    const targetBounds = getNodeBounds(parsed.target);
+
+                    if (sourceBounds && targetBounds) {
+                        // Build list of points: source, waypoints, target
+                        const points = [
+                            { x: sourceBounds.cx, y: sourceBounds.cy },
+                            ...waypoints,
+                            { x: targetBounds.cx, y: targetBounds.cy }
+                        ];
+
+                        // Find closest segment
+                        let minDist = Infinity;
+                        for (let i = 0; i < points.length - 1; i++) {
+                            const dist = pointToSegmentDistance(x, y, points[i], points[i + 1]);
+                            if (dist < minDist) {
+                                minDist = dist;
+                                insertIndex = i;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Insert waypoint at the best position (inactive until dragged)
+            waypoints.splice(insertIndex, 0, { x, y, active: false });
+
+            // Render waypoints (but don't update edge path since waypoint is inactive)
+            renderWaypoints();
+            // Don't save yet - will save when waypoint is activated by dragging
+        }
+
+        // Calculate distance from point to line segment
+        function pointToSegmentDistance(px, py, p1, p2) {
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const lenSq = dx * dx + dy * dy;
+
+            if (lenSq === 0) {
+                return Math.sqrt((px - p1.x) ** 2 + (py - p1.y) ** 2);
+            }
+
+            let t = ((px - p1.x) * dx + (py - p1.y) * dy) / lenSq;
+            t = Math.max(0, Math.min(1, t));
+
+            const nearX = p1.x + t * dx;
+            const nearY = p1.y + t * dy;
+
+            return Math.sqrt((px - nearX) ** 2 + (py - nearY) ** 2);
+        }
+
+        // Remove a waypoint
+        function removeWaypoint(edgeId, index) {
+            const key = getEdgeKey(edgeId);
+            if (!edgeWaypoints[key]) return;
+
+            edgeWaypoints[key].splice(index, 1);
+            if (edgeWaypoints[key].length === 0) {
+                delete edgeWaypoints[key];
+            }
+
+            updateEdgeWithWaypoints(edgeId);
+            renderWaypoints();
+            saveWaypoints(edgeId);
+        }
+
+        // Update a single edge with its waypoints
+        function updateEdgeWithWaypoints(edgeId) {
+            const allEdges = findAllEdges();
+            const edge = allEdges.find(e => e.edgeId === edgeId);
+            if (!edge) return;
+
+            const parsed = parseEdgeId(edgeId);
+            if (!parsed || parsed.source === parsed.target) return;
+
+            const sourceBounds = getNodeBounds(parsed.source);
+            const targetBounds = getNodeBounds(parsed.target);
+            if (!sourceBounds || !targetBounds) return;
+
+            const key = getEdgeKey(edgeId);
+            const waypoints = edgeWaypoints[key] || [];
+            const routingMode = edgeRoutingMode[key] || 'direct';
+            const arrowInfo = getArrowInfo(parsed.direction);
+
+            const newPath = calculateEdgePathWithWaypoints(
+                sourceBounds, targetBounds, waypoints,
+                arrowInfo.hasSourceArrow, arrowInfo.hasTargetArrow, routingMode
+            );
+
+            edge.path.setAttribute('d', newPath);
+
+            // Update clickable overlay too
+            const clickable = edge.group.querySelector('.edge-clickable');
+            if (clickable) {
+                clickable.setAttribute('d', newPath);
+            }
+        }
+
+        // Render all waypoint handles with X delete buttons (Structurizr-style)
+        function renderWaypoints() {
+            const svg = canvas.querySelector('svg');
+            if (!svg) return;
+
+            // Remove existing waypoint groups
+            svg.querySelectorAll('.waypoint-group').forEach(el => el.remove());
+
+            // Create waypoint groups for each edge
+            for (const [edgeId, waypoints] of Object.entries(edgeWaypoints)) {
+                const allEdges = findAllEdges();
+                // Match using normalized edge ID
+                const edge = allEdges.find(e => getEdgeKey(e.edgeId) === edgeId);
+                if (!edge) continue;
+
+                waypoints.forEach((wp, index) => {
+                    // Create group for waypoint + delete button
+                    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                    group.setAttribute('class', 'waypoint-group');
+                    group.setAttribute('transform', `translate(${wp.x}, ${wp.y})`);
+
+                    // Main drag circle
+                    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    // Add 'inactive' class if waypoint is not yet active
+                    const waypointClass = wp.active === false ? 'waypoint inactive' : 'waypoint';
+                    circle.setAttribute('class', waypointClass);
+                    circle.setAttribute('cx', 0);
+                    circle.setAttribute('cy', 0);
+                    circle.setAttribute('r', 6);
+                    circle.dataset.edgeId = edgeId;
+                    circle.dataset.waypointIndex = index;
+
+                    // Delete button (small circle with X, positioned top-right)
+                    const deleteBtn = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    deleteBtn.setAttribute('class', 'waypoint-delete');
+                    deleteBtn.setAttribute('cx', 10);
+                    deleteBtn.setAttribute('cy', -10);
+                    deleteBtn.setAttribute('r', 7);
+
+                    // X lines inside delete button
+                    const xLine1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    xLine1.setAttribute('class', 'waypoint-delete-x');
+                    xLine1.setAttribute('x1', 7);
+                    xLine1.setAttribute('y1', -13);
+                    xLine1.setAttribute('x2', 13);
+                    xLine1.setAttribute('y2', -7);
+
+                    const xLine2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    xLine2.setAttribute('class', 'waypoint-delete-x');
+                    xLine2.setAttribute('x1', 13);
+                    xLine2.setAttribute('y1', -13);
+                    xLine2.setAttribute('x2', 7);
+                    xLine2.setAttribute('y2', -7);
+
+                    // Drag to move (on main circle)
+                    circle.addEventListener('mousedown', (e) => {
+                        if (e.button !== 0) return;
+                        e.stopPropagation();
+
+                        isDraggingWaypoint = true;
+                        draggedWaypointEdgeId = edgeId;
+                        draggedWaypointIndex = index;
+                        waypointStartX = e.clientX;
+                        waypointStartY = e.clientY;
+                        circle.classList.add('dragging');
+                        circle.classList.remove('inactive');
+
+                        // Activate the waypoint on drag start
+                        const key = getEdgeKey(edgeId);
+                        if (edgeWaypoints[key] && edgeWaypoints[key][index]) {
+                            edgeWaypoints[key][index].active = true;
+                            // Update edge path now that waypoint is active
+                            updateEdgeWithWaypoints(edgeId);
+                        }
+                    });
+
+                    // Click X button to remove (Structurizr-style)
+                    deleteBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        removeWaypoint(edgeId, index);
+                    });
+
+                    group.appendChild(circle);
+                    group.appendChild(deleteBtn);
+                    group.appendChild(xLine1);
+                    group.appendChild(xLine2);
+                    svg.appendChild(group);
+                });
+            }
+        }
+
+        // Save waypoints to server
+        function saveWaypoints(edgeId) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+            const key = getEdgeKey(edgeId);
+            const allWaypoints = edgeWaypoints[key] || [];
+            // Only save active waypoints, and strip the 'active' flag (all saved are active)
+            const waypoints = allWaypoints
+                .filter(wp => wp.active !== false)
+                .map(wp => ({ x: wp.x, y: wp.y }));
+
+            ws.send(JSON.stringify({
+                type: 'waypoints',
+                edgeId: edgeId,
+                waypoints: waypoints
+            }));
+        }
+
+        // Toggle routing mode for an edge (direct -> orthogonal -> direct)
+        function toggleRoutingMode(edgeId) {
+            const key = getEdgeKey(edgeId);
+            const currentMode = edgeRoutingMode[key] || 'direct';
+            const modes = ['direct', 'orthogonal'];
+            const currentIndex = modes.indexOf(currentMode);
+            const nextMode = modes[(currentIndex + 1) % modes.length];
+
+            edgeRoutingMode[key] = nextMode;
+            updateEdgeWithWaypoints(edgeId);
+            saveRoutingMode(edgeId, nextMode);
+            showToast(`Routing: ${nextMode}`, 'success');
+        }
+
+        // Save routing mode to server
+        function saveRoutingMode(edgeId, mode) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+            ws.send(JSON.stringify({
+                type: 'routing',
+                edgeId: edgeId,
+                routingMode: mode
+            }));
+        }
+
+        // Get routing mode for an edge
+        function getRoutingMode(edgeId) {
+            const key = getEdgeKey(edgeId);
+            return edgeRoutingMode[key] || 'direct';
+        }
+
+        // ============================================
+        // End Edge Waypoint Functions
+        // ============================================
+
+        // ============================================
+        // End Edge Following Functions
+        // ============================================
 
         // Get node ID from SVG group element
         function getNodeId(element) {
@@ -642,7 +1530,7 @@
             }
         }
 
-        // Apply stored positions to nodes
+        // Apply stored positions to nodes and update edges
         function applyNodePositions() {
             const nodes = findDraggableNodes();
             for (const { element, nodeId } of nodes) {
@@ -653,10 +1541,40 @@
                     element.style.transform = '';
                 }
             }
+
+            // Update all edges to follow node positions
+            updateAllEdges();
         }
 
-        // Global mouse move handler for node dragging
+        // Global mouse move handler for node and waypoint dragging
         document.addEventListener('mousemove', (e) => {
+            // Handle waypoint dragging
+            if (isDraggingWaypoint && draggedWaypointEdgeId !== null) {
+                const key = getEdgeKey(draggedWaypointEdgeId);
+                if (edgeWaypoints[key] && edgeWaypoints[key][draggedWaypointIndex]) {
+                    // Get the SVG point for accurate positioning
+                    const svg = canvas.querySelector('svg');
+                    const pt = svg.createSVGPoint();
+                    pt.x = e.clientX;
+                    pt.y = e.clientY;
+                    // getScreenCTM().inverse() already converts to SVG coordinate space
+                    const svgPt = pt.matrixTransform(svg.getScreenCTM().inverse());
+
+                    // Preserve the active flag when updating position
+                    const currentWaypoint = edgeWaypoints[key][draggedWaypointIndex];
+                    edgeWaypoints[key][draggedWaypointIndex] = {
+                        x: svgPt.x,
+                        y: svgPt.y,
+                        active: currentWaypoint.active
+                    };
+
+                    updateEdgeWithWaypoints(draggedWaypointEdgeId);
+                    renderWaypoints();
+                }
+                return;
+            }
+
+            // Handle node dragging
             if (!isDraggingNode || !draggedNode) return;
 
             // Calculate delta (account for zoom)
@@ -667,10 +1585,33 @@
             const newDX = dragInitialDX + dx;
             const newDY = dragInitialDY + dy;
             draggedNode.style.transform = `translate(${newDX}px, ${newDY}px)`;
+
+            // Update connected edges to follow the node
+            nodePositions[draggedNodeId] = { dx: newDX, dy: newDY };
+            updateConnectedEdges(draggedNodeId);
         });
 
-        // Global mouse up handler for node dragging
+        // Global mouse up handler for node and waypoint dragging
         document.addEventListener('mouseup', (e) => {
+            // Handle waypoint drag end
+            if (isDraggingWaypoint && draggedWaypointEdgeId !== null) {
+                // Save the waypoint position
+                saveWaypoints(draggedWaypointEdgeId);
+
+                // Remove dragging class from waypoint
+                const svg = canvas.querySelector('svg');
+                if (svg) {
+                    svg.querySelectorAll('.waypoint.dragging').forEach(el => el.classList.remove('dragging'));
+                }
+
+                // Reset state
+                isDraggingWaypoint = false;
+                draggedWaypointEdgeId = null;
+                draggedWaypointIndex = -1;
+                return;
+            }
+
+            // Handle node drag end
             if (!isDraggingNode || !draggedNode) return;
 
             // Calculate final delta
@@ -697,6 +1638,11 @@
             isDraggingNode = false;
             draggedNode = null;
             draggedNodeId = null;
+
+            // Request a re-render to get D2's proper edge routing
+            // The re-render will produce new SVG, then applyNodePositions()
+            // will reapply the CSS transforms and recalculate edges
+            requestRerender();
         });
 
         function showError(error) {
@@ -813,6 +1759,27 @@
 
             updateTransform();
         }, { passive: false });
+
+        // Keyboard shortcuts for edge waypoints (Structurizr-style)
+        document.addEventListener('keydown', (e) => {
+            // Only handle when hovering over an edge
+            if (!hoveredEdgeId) return;
+
+            // Don't intercept when typing in editor
+            if (document.activeElement && document.activeElement.closest('.monaco-editor')) return;
+
+            const key = e.key.toLowerCase();
+
+            if (key === 'r') {
+                // Toggle routing mode: direct -> orthogonal -> direct
+                toggleRoutingMode(hoveredEdgeId);
+                e.preventDefault();
+            } else if (key === 'v') {
+                // Add vertex at current mouse position
+                addWaypoint(hoveredEdgeId, lastMousePosition.x, lastMousePosition.y);
+                e.preventDefault();
+            }
+        });
 
         // Resizer
         let isResizing = false;

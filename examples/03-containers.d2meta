@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "positions": {
+    "aws.vpc": {
+      "dx": -5.476219145093324,
+      "dy": -7.301625526791092
+    },
+    "aws.vpc.private": {
+      "dx": 0,
+      "dy": 0
+    },
+    "aws.vpc.private.database.replica": {
+      "dx": 9.127031908488862,
+      "dy": -16.428657435279952
+    },
+    "aws.vpc.private.webserver1": {
+      "dx": -18.254063816977723,
+      "dy": 82.14328717639975
+    },
+    "aws.vpc.private.webserver2": {
+      "dx": -45.6351595424443,
+      "dy": 32.857314870559904
+    },
+    "aws.vpc.public.loadbalancer": {
+      "dx": 7.301625526791099,
+      "dy": -1.825406381697773
+    }
+  },
+  "sourceHash": "20898079878da6c7"
+}
