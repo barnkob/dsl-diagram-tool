@@ -136,10 +136,10 @@ type WSMessage struct {
 	DY        float64                `json:"dy,omitempty"`        // For position: y offset
 	Positions map[string]NodeOffset  `json:"positions,omitempty"` // For positions: all offsets
 
-	// Waypoint-related fields
-	EdgeID        string                   `json:"edgeId,omitempty"`       // For waypoints: edge identifier
-	EdgeWaypoints []EdgePoint              `json:"waypoints,omitempty"`    // For waypoints: single edge waypoints
-	AllWaypoints  map[string][]EdgePoint   `json:"allWaypoints,omitempty"` // For waypoints: all edge waypoints
+	// Vertex-related fields
+	EdgeID      string                 `json:"edgeId,omitempty"`      // For vertices: edge identifier
+	Vertices    []Vertex               `json:"vertices,omitempty"`    // For vertices: single edge vertices
+	AllVertices map[string][]Vertex    `json:"allVertices,omitempty"` // For vertices: all edge vertices
 
 	// Routing mode fields
 	RoutingMode    string            `json:"routingMode,omitempty"`    // For routing: edge routing mode (direct, orthogonal)
@@ -173,13 +173,13 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	// Send initial positions, waypoints, and routing modes
+	// Send initial positions, vertices, and routing modes
 	meta := s.GetMetadata()
-	if meta.HasPositions() || meta.HasWaypoints() || meta.HasRoutingModes() {
+	if meta.HasPositions() || meta.HasVertices() || meta.HasRoutingModes() {
 		conn.WriteJSON(WSMessage{
 			Type:           "positions",
 			Positions:      meta.Positions,
-			AllWaypoints:   meta.Waypoints,
+			AllVertices:    meta.Vertices,
 			AllRoutingMode: meta.RoutingMode,
 		})
 	}
@@ -317,8 +317,8 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 				NodeID: msg.NodeID,
 			})
 
-		case "waypoints":
-			// Update edge waypoints
+		case "vertices":
+			// Update edge vertices
 			if msg.EdgeID == "" {
 				conn.WriteJSON(WSMessage{
 					Type:  "error",
@@ -327,17 +327,17 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			if err := s.SetEdgeWaypoints(msg.EdgeID, msg.EdgeWaypoints); err != nil {
+			if err := s.SetEdgeVertices(msg.EdgeID, msg.Vertices); err != nil {
 				conn.WriteJSON(WSMessage{
 					Type:  "error",
-					Error: "Failed to save waypoints: " + err.Error(),
+					Error: "Failed to save vertices: " + err.Error(),
 				})
 				continue
 			}
 
-			// Acknowledge waypoints saved
+			// Acknowledge vertices saved
 			conn.WriteJSON(WSMessage{
-				Type:   "waypoints-saved",
+				Type:   "vertices-saved",
 				EdgeID: msg.EdgeID,
 			})
 
@@ -367,7 +367,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			})
 
 		case "clear-positions":
-			// Clear all positions and waypoints
+			// Clear all positions and vertices
 			if err := s.ClearAllPositions(); err != nil {
 				conn.WriteJSON(WSMessage{
 					Type:  "error",

@@ -297,17 +297,17 @@ func (s *Server) GetMetadata() *Metadata {
 		Version:     s.metadata.Version,
 		SourceHash:  s.metadata.SourceHash,
 		Positions:   make(map[string]NodeOffset),
-		Waypoints:   make(map[string][]EdgePoint),
+		Vertices:    make(map[string][]Vertex),
 		RoutingMode: make(map[string]string),
 	}
 	for k, v := range s.metadata.Positions {
 		metaCopy.Positions[k] = v
 	}
-	for k, v := range s.metadata.Waypoints {
-		// Deep copy waypoints slice
-		waypointsCopy := make([]EdgePoint, len(v))
-		copy(waypointsCopy, v)
-		metaCopy.Waypoints[k] = waypointsCopy
+	for k, v := range s.metadata.Vertices {
+		// Deep copy vertices slice
+		verticesCopy := make([]Vertex, len(v))
+		copy(verticesCopy, v)
+		metaCopy.Vertices[k] = verticesCopy
 	}
 	for k, v := range s.metadata.RoutingMode {
 		metaCopy.RoutingMode[k] = v
@@ -327,11 +327,11 @@ func (s *Server) SetNodePosition(nodeID string, dx, dy float64) error {
 	return nil
 }
 
-// ClearAllPositions clears all position overrides, waypoints, and routing modes.
+// ClearAllPositions clears all position overrides, vertices, and routing modes.
 func (s *Server) ClearAllPositions() error {
 	s.metadataMu.Lock()
 	s.metadata.Positions = make(map[string]NodeOffset)
-	s.metadata.Waypoints = make(map[string][]EdgePoint)
+	s.metadata.Vertices = make(map[string][]Vertex)
 	s.metadata.RoutingMode = make(map[string]string)
 	s.metadataMu.Unlock()
 
@@ -341,10 +341,10 @@ func (s *Server) ClearAllPositions() error {
 	return nil
 }
 
-// SetEdgeWaypoints updates an edge's waypoints and saves metadata.
-func (s *Server) SetEdgeWaypoints(edgeID string, waypoints []EdgePoint) error {
+// SetEdgeVertices updates an edge's vertices and saves metadata.
+func (s *Server) SetEdgeVertices(edgeID string, vertices []Vertex) error {
 	s.metadataMu.Lock()
-	s.metadata.SetWaypoints(edgeID, waypoints)
+	s.metadata.SetVertices(edgeID, vertices)
 	s.metadataMu.Unlock()
 
 	if s.FilePath != "" {

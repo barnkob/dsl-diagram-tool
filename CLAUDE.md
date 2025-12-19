@@ -71,32 +71,37 @@ This project uses work packages (WP) for development:
 
 ## Browser Editor Features
 
-The tool includes a browser-based editor (`diagtool edit`) with interactive diagram manipulation.
+The tool includes a browser-based editor (`diagtool serve`) with interactive diagram manipulation.
 
-### Waypoints (Edge Routing)
+### Frontend (JointJS)
 
-Design inspired by [Structurizr's diagram editor](https://docs.structurizr.com/ui/diagrams/editor). See `docs/DESIGN-waypoints.md` for full details.
+The browser editor uses [JointJS](https://www.jointjs.com/) for diagram rendering and interaction.
+
+**Key Benefits:**
+- Built-in drag-and-drop for nodes
+- Built-in vertex (bend point) manipulation for edges
+- Professional diagramming library with extensive features
+
+### Vertices (Edge Bend Points)
+
+Design inspired by [Structurizr's diagram editor](https://docs.structurizr.com/ui/diagrams/editor).
 
 **Architecture:**
-- Waypoints stored in `.d2meta` files (not in D2 source)
-- Source hash validation clears waypoints when D2 source changes
+- Vertices stored in `.d2meta` files (not in D2 source)
+- Source hash validation clears vertices when D2 source changes
 - Edge IDs normalized to handle HTML entity encoding
 
 **Key Files:**
-- `pkg/server/metadata.go` - `Metadata` struct with `Waypoints` and `RoutingMode` maps
-- `pkg/server/handlers.go` - WebSocket messages: `waypoints`, `routing`, `positions`
-- `pkg/server/web/dist/index.html` - Frontend with edge path calculation
+- `pkg/server/metadata.go` - `Metadata` struct with `Vertices` and `RoutingMode` maps
+- `pkg/server/handlers.go` - WebSocket messages: `vertices`, `routing`, `positions`
+- `pkg/server/web/dist/index.html` - JointJS-based frontend
 
 **Interaction Model:**
-- Click edge to add waypoint
-- Drag waypoint circle to move
-- Click X button to delete waypoint
-- Press 'R' while hovering edge to toggle routing mode (direct/orthogonal)
-- Press 'V' while hovering edge to add waypoint at cursor
-
-**Routing Modes:**
-- `direct` - Straight lines through waypoints (default)
-- `orthogonal` - Right-angle routing through waypoints
+- Click edge to select and show vertex tools
+- Click on edge path to add a vertex
+- Drag vertex circles to bend the edge
+- Double-click vertex to remove it
+- Drag nodes to reposition them
 
 ## Current Status
 

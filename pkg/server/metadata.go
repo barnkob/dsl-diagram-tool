@@ -10,14 +10,14 @@ import (
 	"strings"
 )
 
-// Metadata stores position overrides for diagram nodes and edge waypoints.
+// Metadata stores position overrides for diagram nodes and edge vertices.
 // Stored in a .d2meta file alongside the .d2 file.
 type Metadata struct {
-	Version     int                      `json:"version"`
-	Positions   map[string]NodeOffset    `json:"positions"`
-	Waypoints   map[string][]EdgePoint   `json:"waypoints,omitempty"`
-	RoutingMode map[string]string        `json:"routingMode,omitempty"`
-	SourceHash  string                   `json:"sourceHash"`
+	Version     int                   `json:"version"`
+	Positions   map[string]NodeOffset `json:"positions"`
+	Vertices    map[string][]Vertex   `json:"vertices,omitempty"`
+	RoutingMode map[string]string     `json:"routingMode,omitempty"`
+	SourceHash  string                `json:"sourceHash"`
 }
 
 // NormalizeEdgeID ensures consistent edge ID format by decoding HTML entities.
@@ -32,8 +32,8 @@ type NodeOffset struct {
 	DY float64 `json:"dy"`
 }
 
-// EdgePoint represents a waypoint coordinate on an edge.
-type EdgePoint struct {
+// Vertex represents a bend point coordinate on an edge.
+type Vertex struct {
 	X float64 `json:"x"`
 	Y float64 `json:"y"`
 }
@@ -43,7 +43,7 @@ func NewMetadata() *Metadata {
 	return &Metadata{
 		Version:     1,
 		Positions:   make(map[string]NodeOffset),
-		Waypoints:   make(map[string][]EdgePoint),
+		Vertices:    make(map[string][]Vertex),
 		RoutingMode: make(map[string]string),
 	}
 }
@@ -75,8 +75,8 @@ func LoadMetadata(d2Path string) (*Metadata, error) {
 	if meta.Positions == nil {
 		meta.Positions = make(map[string]NodeOffset)
 	}
-	if meta.Waypoints == nil {
-		meta.Waypoints = make(map[string][]EdgePoint)
+	if meta.Vertices == nil {
+		meta.Vertices = make(map[string][]Vertex)
 	}
 	if meta.RoutingMode == nil {
 		meta.RoutingMode = make(map[string]string)
@@ -103,15 +103,15 @@ func HashSource(source string) string {
 	return hex.EncodeToString(hash[:8]) // First 8 bytes is enough
 }
 
-// ValidateAndClean checks if source hash matches and clears positions/waypoints/routing if not.
+// ValidateAndClean checks if source hash matches and clears positions/vertices/routing if not.
 // Returns true if data was cleared.
 func (m *Metadata) ValidateAndClean(currentSource string) bool {
 	currentHash := HashSource(currentSource)
 
 	if m.SourceHash != currentHash {
-		// Source changed, clear all positions, waypoints, and routing modes
+		// Source changed, clear all positions, vertices, and routing modes
 		m.Positions = make(map[string]NodeOffset)
-		m.Waypoints = make(map[string][]EdgePoint)
+		m.Vertices = make(map[string][]Vertex)
 		m.RoutingMode = make(map[string]string)
 		m.SourceHash = currentHash
 		return true
@@ -144,30 +144,30 @@ func (m *Metadata) HasPositions() bool {
 	return len(m.Positions) > 0
 }
 
-// SetWaypoints updates or adds waypoints for an edge.
+// SetVertices updates or adds vertices for an edge.
 // Edge IDs are normalized to handle HTML entity encoding.
-func (m *Metadata) SetWaypoints(edgeID string, waypoints []EdgePoint) {
+func (m *Metadata) SetVertices(edgeID string, vertices []Vertex) {
 	normalizedID := NormalizeEdgeID(edgeID)
-	if len(waypoints) == 0 {
-		delete(m.Waypoints, normalizedID)
+	if len(vertices) == 0 {
+		delete(m.Vertices, normalizedID)
 	} else {
-		m.Waypoints[normalizedID] = waypoints
+		m.Vertices[normalizedID] = vertices
 	}
 }
 
-// GetWaypoints returns the waypoints for an edge.
+// GetVertices returns the vertices for an edge.
 // Returns empty slice if not found.
-func (m *Metadata) GetWaypoints(edgeID string) []EdgePoint {
+func (m *Metadata) GetVertices(edgeID string) []Vertex {
 	normalizedID := NormalizeEdgeID(edgeID)
-	if waypoints, ok := m.Waypoints[normalizedID]; ok {
-		return waypoints
+	if vertices, ok := m.Vertices[normalizedID]; ok {
+		return vertices
 	}
-	return []EdgePoint{}
+	return []Vertex{}
 }
 
-// HasWaypoints returns true if there are any edge waypoints.
-func (m *Metadata) HasWaypoints() bool {
-	return len(m.Waypoints) > 0
+// HasVertices returns true if there are any edge vertices.
+func (m *Metadata) HasVertices() bool {
+	return len(m.Vertices) > 0
 }
 
 // SetRoutingMode updates or adds a routing mode for an edge.
