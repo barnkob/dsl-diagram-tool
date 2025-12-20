@@ -362,6 +362,12 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
 
     <script>
+        // Theme state - apply IMMEDIATELY before anything else
+        let isDarkTheme = localStorage.getItem('theme') !== 'light';
+        if (!isDarkTheme) {
+            document.body.classList.add('light-theme');
+        }
+
         // Monaco Editor setup
         require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
 
@@ -371,9 +377,6 @@
         let isDirty = false;
         let pendingExternalContent = null;
         const DEBOUNCE_DELAY = 300;
-
-        // Theme state
-        let isDarkTheme = localStorage.getItem('theme') !== 'light';
 
         // JointJS state
         let graph;
@@ -1309,13 +1312,7 @@
                 }
             });
 
-        // Apply initial theme on load (before Monaco loads)
-        if (!isDarkTheme) {
-            document.body.classList.add('light-theme');
-            // Button text will be updated when applyTheme runs after init
-        }
-
-        // After initialization, ensure button text is correct
+        // Update theme button text on load
         document.addEventListener('DOMContentLoaded', () => {
             const themeBtn = document.getElementById('themeToggleBtn');
             if (themeBtn) {

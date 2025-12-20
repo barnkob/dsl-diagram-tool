@@ -1,62 +1,10 @@
 {
   "version": 1,
   "positions": {
-    "aws.vpc": {
-      "dx": -5.476219145093324,
-      "dy": -7.301625526791092
-    },
     "aws.vpc.private": {
-      "dx": -7,
-      "dy": -11
-    },
-    "aws.vpc.private.database.primary": {
-      "dx": 8,
-      "dy": 3
-    },
-    "aws.vpc.private.database.replica": {
-      "dx": 9.127031908488862,
-      "dy": -16.428657435279952
-    },
-    "aws.vpc.private.webserver1": {
-      "dx": -18.254063816977723,
-      "dy": 82.14328717639975
-    },
-    "aws.vpc.private.webserver2": {
-      "dx": 16,
-      "dy": 19
-    },
-    "aws.vpc.public": {
-      "dx": -121,
-      "dy": -35
-    },
-    "aws.vpc.public.loadbalancer": {
-      "dx": -131,
-      "dy": -35
-    },
-    "aws.vpc.public.nat": {
-      "dx": -137,
-      "dy": -35
+      "dx": 3,
+      "dy": -1
     }
-  },
-  "vertices": {
-    "aws.vpc.(public.loadbalancer -\u003e private.webserver1)[0]": [
-      {
-        "x": 137.25,
-        "y": 540
-      }
-    ],
-    "aws.vpc.(public.loadbalancer -\u003e private.webserver2)[0]": [
-      {
-        "x": 348.5,
-        "y": 540
-      }
-    ],
-    "aws.vpc.private.(webserver2 -\u003e database.primary)[0]": [
-      {
-        "x": 370,
-        "y": 899
-      }
-    ]
   },
   "sourceHash": "20898079878da6c7"
 }
