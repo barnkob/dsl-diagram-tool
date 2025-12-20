@@ -131,15 +131,15 @@ type WSMessage struct {
 	Filename string `json:"filename,omitempty"` // For export: suggested filename
 
 	// Position-related fields
-	NodeID    string                 `json:"nodeId,omitempty"`    // For position: node identifier
-	DX        float64                `json:"dx,omitempty"`        // For position: x offset
-	DY        float64                `json:"dy,omitempty"`        // For position: y offset
-	Positions map[string]NodeOffset  `json:"positions,omitempty"` // For positions: all offsets
+	NodeID    string                `json:"nodeId,omitempty"`    // For position: node identifier
+	DX        float64               `json:"dx,omitempty"`        // For position: x offset
+	DY        float64               `json:"dy,omitempty"`        // For position: y offset
+	Positions map[string]NodeOffset `json:"positions,omitempty"` // For positions: all offsets
 
 	// Vertex-related fields
-	EdgeID      string                 `json:"edgeId,omitempty"`      // For vertices: edge identifier
-	Vertices    []Vertex               `json:"vertices,omitempty"`    // For vertices: single edge vertices
-	AllVertices map[string][]Vertex    `json:"allVertices,omitempty"` // For vertices: all edge vertices
+	EdgeID      string              `json:"edgeId,omitempty"`      // For vertices: edge identifier
+	Vertices    []Vertex            `json:"vertices,omitempty"`    // For vertices: single edge vertices
+	AllVertices map[string][]Vertex `json:"allVertices,omitempty"` // For vertices: all edge vertices
 
 	// Routing mode fields
 	RoutingMode    string            `json:"routingMode,omitempty"`    // For routing: edge routing mode (direct, orthogonal)

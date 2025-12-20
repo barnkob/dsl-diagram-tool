@@ -397,6 +397,78 @@
         const resizer = document.getElementById('resizer');
         const d2SvgHidden = document.getElementById('d2-svg-hidden');
 
+        // Simple undo manager for free JointJS (mimics CommandManager API)
+        function createSimpleUndoManager(graph) {
+            const undoStack = [];
+            const redoStack = [];
+            const maxStackSize = 50;
+            let isUndoRedo = false;
+
+            // Listen for changes
+            graph.on('change:position', (cell, position, opt) => {
+                if (isUndoRedo || (opt && opt.skipUndo)) return;
+                const prevPosition = cell.previous('position');
+                if (prevPosition) {
+                    undoStack.push({
+                        type: 'position',
+                        cellId: cell.id,
+                        oldValue: prevPosition,
+                        newValue: position
+                    });
+                    if (undoStack.length > maxStackSize) undoStack.shift();
+                    redoStack.length = 0; // Clear redo on new action
+                }
+            });
+
+            graph.on('change:vertices', (cell, vertices, opt) => {
+                if (isUndoRedo || (opt && opt.skipUndo)) return;
+                const prevVertices = cell.previous('vertices');
+                undoStack.push({
+                    type: 'vertices',
+                    cellId: cell.id,
+                    oldValue: prevVertices ? [...prevVertices] : [],
+                    newValue: vertices ? [...vertices] : []
+                });
+                if (undoStack.length > maxStackSize) undoStack.shift();
+                redoStack.length = 0;
+            });
+
+            return {
+                hasUndo: () => undoStack.length > 0,
+                hasRedo: () => redoStack.length > 0,
+                undo: () => {
+                    if (undoStack.length === 0) return;
+                    const action = undoStack.pop();
+                    const cell = graph.getCell(action.cellId);
+                    if (!cell) return;
+
+                    isUndoRedo = true;
+                    if (action.type === 'position') {
+                        cell.position(action.oldValue.x, action.oldValue.y, { skipUndo: true });
+                    } else if (action.type === 'vertices') {
+                        cell.vertices(action.oldValue, { skipUndo: true });
+                    }
+                    isUndoRedo = false;
+                    redoStack.push(action);
+                },
+                redo: () => {
+                    if (redoStack.length === 0) return;
+                    const action = redoStack.pop();
+                    const cell = graph.getCell(action.cellId);
+                    if (!cell) return;
+
+                    isUndoRedo = true;
+                    if (action.type === 'position') {
+                        cell.position(action.newValue.x, action.newValue.y, { skipUndo: true });
+                    } else if (action.type === 'vertices') {
+                        cell.vertices(action.newValue, { skipUndo: true });
+                    }
+                    isUndoRedo = false;
+                    undoStack.push(action);
+                }
+            };
+        }
+
         // Get current theme colors
         function getThemeColors() {
             const style = getComputedStyle(document.body);
@@ -440,8 +512,14 @@
                 defaultConnector: { name: 'rounded', args: { radius: 5 } }
             });
 
-            // Initialize CommandManager for undo/redo
-            commandManager = new joint.dia.CommandManager({ graph: graph });
+            // Initialize CommandManager for undo/redo (if available - it's part of JointJS+)
+            // For the free version, we'll implement a simple undo stack
+            if (joint.dia.CommandManager) {
+                commandManager = new joint.dia.CommandManager({ graph: graph });
+            } else {
+                // Simple undo stack for free JointJS
+                commandManager = createSimpleUndoManager(graph);
+            }
 
             // Handle link vertex changes (add, move, remove)
             graph.on('change:vertices', (link, vertices) => {
