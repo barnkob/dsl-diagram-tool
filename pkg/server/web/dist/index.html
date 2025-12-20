@@ -5,44 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DiagTool Editor</title>
     <style>
-        /* Theme CSS Variables */
-        :root {
-            /* Dark theme (default) */
-            --bg-primary: #1e1e1e;
-            --bg-secondary: #252526;
-            --bg-tertiary: #2d2d2d;
-            --bg-header: #333;
-            --text-primary: #d4d4d4;
-            --text-secondary: #888;
-            --border-color: #555;
-            --resizer-color: #333;
-            --node-fill: #3c3c3c;
-            --node-stroke: #6a6a6a;
-            --link-stroke: #888;
-            --grid-color: #444;
-            --button-primary: #0e639c;
-            --button-primary-hover: #1177bb;
-            --button-secondary: #3c3c3c;
-            --button-secondary-hover: #4c4c4c;
-        }
-        body.light-theme {
-            --bg-primary: #ffffff;
-            --bg-secondary: #f3f3f3;
-            --bg-tertiary: #e8e8e8;
-            --bg-header: #e0e0e0;
-            --text-primary: #1e1e1e;
-            --text-secondary: #666;
-            --border-color: #ccc;
-            --resizer-color: #ccc;
-            --node-fill: #ffffff;
-            --node-stroke: #333;
-            --link-stroke: #555;
-            --grid-color: #ddd;
-            --button-primary: #0e639c;
-            --button-primary-hover: #1177bb;
-            --button-secondary: #d4d4d4;
-            --button-secondary-hover: #c0c0c0;
-        }
         * {
             margin: 0;
             padding: 0;
@@ -50,11 +12,10 @@
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
+            background: #1e1e1e;
+            color: #d4d4d4;
             height: 100vh;
             overflow: hidden;
-            transition: background 0.2s, color 0.2s;
         }
         .container {
             display: flex;
@@ -64,18 +25,18 @@
             display: flex;
             flex-direction: column;
             min-width: 200px;
-            background: var(--bg-primary);
+            background: #1e1e1e;
         }
         .canvas-pane {
             flex: 1;
             display: flex;
             flex-direction: column;
-            background: var(--bg-secondary);
+            background: #f5f5f5;
             min-width: 200px;
         }
         .resizer {
             width: 4px;
-            background: var(--resizer-color);
+            background: #333;
             cursor: col-resize;
             transition: background 0.2s;
         }
@@ -84,7 +45,7 @@
         }
         .header {
             padding: 8px 16px;
-            background: var(--bg-header);
+            background: #333;
             display: flex;
             align-items: center;
             gap: 16px;
@@ -94,6 +55,10 @@
         .header h1 {
             font-size: 14px;
             font-weight: 600;
+        }
+        .canvas-pane .header {
+            background: #e0e0e0;
+            color: #333;
         }
         .status {
             margin-left: auto;
@@ -122,11 +87,11 @@
             overflow: hidden;
             position: relative;
         }
-        /* JointJS paper container */
+        /* JointJS paper container - light theme */
         #jointjs-paper {
             width: 100%;
             height: 100%;
-            background: var(--bg-tertiary);
+            background: #ffffff;
         }
         /* Hidden D2 SVG container for parsing */
         #d2-svg-hidden {
@@ -174,7 +139,7 @@
         }
         .toolbar {
             padding: 4px 8px;
-            background: var(--bg-tertiary);
+            background: #2d2d2d;
             display: flex;
             gap: 8px;
             align-items: center;
@@ -182,7 +147,7 @@
         }
         .toolbar button {
             padding: 4px 12px;
-            background: var(--button-primary);
+            background: #0e639c;
             color: white;
             border: none;
             border-radius: 3px;
@@ -190,26 +155,26 @@
             font-size: 12px;
         }
         .toolbar button:hover {
-            background: var(--button-primary-hover);
+            background: #1177bb;
         }
         .toolbar button:disabled {
-            background: var(--border-color);
+            background: #555;
             cursor: not-allowed;
         }
         .toolbar button.secondary {
-            background: var(--button-secondary);
-            color: var(--text-primary);
+            background: #3c3c3c;
+            color: #d4d4d4;
         }
         .toolbar button.secondary:hover {
-            background: var(--button-secondary-hover);
+            background: #4c4c4c;
         }
         .toolbar .separator {
-            border-left: 1px solid var(--border-color);
+            border-left: 1px solid #555;
             height: 20px;
             margin: 0 4px;
         }
         .file-path {
-            color: var(--text-secondary);
+            color: #888;
             font-size: 12px;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -221,8 +186,8 @@
             bottom: 20px;
             right: 20px;
             padding: 12px 20px;
-            background: var(--bg-header);
-            color: var(--text-primary);
+            background: #333;
+            color: #d4d4d4;
             border-radius: 4px;
             font-size: 13px;
             opacity: 0;
@@ -326,8 +291,6 @@
                 <button id="exportSvgBtn" class="secondary" onclick="exportDiagram('svg')" title="Export as SVG (1)">SVG</button>
                 <button id="exportPngBtn" class="secondary" onclick="exportDiagram('png')" title="Export as PNG (2)">PNG</button>
                 <button id="exportPdfBtn" class="secondary" onclick="exportDiagram('pdf')" title="Export as PDF (3)">PDF</button>
-                <span class="separator"></span>
-                <button id="themeToggleBtn" class="secondary" onclick="toggleTheme()" title="Toggle light/dark mode (T)">Light</button>
             </div>
             <div id="editor"></div>
         </div>
@@ -362,12 +325,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
 
     <script>
-        // Theme state - apply IMMEDIATELY before anything else
-        let isDarkTheme = localStorage.getItem('theme') !== 'light';
-        if (!isDarkTheme) {
-            document.body.classList.add('light-theme');
-        }
-
         // Monaco Editor setup
         require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
 
@@ -377,6 +334,16 @@
         let isDirty = false;
         let pendingExternalContent = null;
         const DEBOUNCE_DELAY = 300;
+
+        // Canvas colors (light theme for diagram)
+        const canvasColors = {
+            background: '#ffffff',
+            grid: '#e0e0e0',
+            nodeFill: '#ffffff',
+            nodeStroke: '#333333',
+            nodeText: '#1e1e1e',
+            linkStroke: '#666666'
+        };
 
         // JointJS state
         let graph;
@@ -472,24 +439,10 @@
             };
         }
 
-        // Get current theme colors
-        function getThemeColors() {
-            const style = getComputedStyle(document.body);
-            return {
-                bgTertiary: style.getPropertyValue('--bg-tertiary').trim(),
-                gridColor: style.getPropertyValue('--grid-color').trim(),
-                nodeFill: style.getPropertyValue('--node-fill').trim(),
-                nodeStroke: style.getPropertyValue('--node-stroke').trim(),
-                linkStroke: style.getPropertyValue('--link-stroke').trim(),
-                textPrimary: style.getPropertyValue('--text-primary').trim()
-            };
-        }
-
         // Initialize JointJS
         function initJointJS() {
             const paperContainer = document.getElementById('jointjs-paper');
             const containerRect = paperContainer.getBoundingClientRect();
-            const colors = getThemeColors();
 
             graph = new joint.dia.Graph({}, { cellNamespace: joint.shapes });
 
@@ -499,8 +452,8 @@
                 width: containerRect.width,
                 height: containerRect.height,
                 gridSize: 10,
-                drawGrid: { name: 'dot', args: { color: colors.gridColor } },
-                background: { color: colors.bgTertiary },
+                drawGrid: { name: 'dot', args: { color: canvasColors.grid } },
+                background: { color: canvasColors.background },
                 cellViewNamespace: joint.shapes,
                 interactive: {
                     elementMove: true,
@@ -743,8 +696,6 @@
             jointElements = {};
             jointLinks = {};
 
-            const colors = getThemeColors();
-
             // Create nodes
             for (const node of nodes) {
                 // Apply stored position offset if any
@@ -757,15 +708,15 @@
                     size: { width: node.width, height: node.height },
                     attrs: {
                         body: {
-                            fill: colors.nodeFill,
-                            stroke: colors.nodeStroke,
+                            fill: canvasColors.nodeFill,
+                            stroke: canvasColors.nodeStroke,
                             strokeWidth: 1,
                             rx: 4,
                             ry: 4
                         },
                         label: {
                             text: node.label,
-                            fill: colors.textPrimary,
+                            fill: canvasColors.nodeText,
                             fontSize: 14
                         }
                     }
@@ -794,12 +745,12 @@
                     target: { id: targetEl.id },
                     attrs: {
                         line: {
-                            stroke: colors.linkStroke,
+                            stroke: canvasColors.linkStroke,
                             strokeWidth: 2,
                             targetMarker: {
                                 type: 'path',
                                 d: 'M 10 -5 0 0 10 5 z',
-                                fill: colors.linkStroke
+                                fill: canvasColors.linkStroke
                             }
                         }
                     }
@@ -810,14 +761,14 @@
                     link.attr('line/sourceMarker', {
                         type: 'path',
                         d: 'M 10 -5 0 0 10 5 z',
-                        fill: colors.linkStroke
+                        fill: canvasColors.linkStroke
                     });
                 } else if (edge.direction === '<-') {
                     link.attr('line/targetMarker', null);
                     link.attr('line/sourceMarker', {
                         type: 'path',
                         d: 'M 10 -5 0 0 10 5 z',
-                        fill: colors.linkStroke
+                        fill: canvasColors.linkStroke
                     });
                 } else if (edge.direction === '--') {
                     link.attr('line/targetMarker', null);
@@ -867,7 +818,7 @@
                 }
             });
 
-            // Define D2 dark theme
+            // Define D2 dark theme for editor
             monaco.editor.defineTheme('d2-dark', {
                 base: 'vs-dark',
                 inherit: true,
@@ -885,28 +836,10 @@
                 colors: {}
             });
 
-            // Define D2 light theme
-            monaco.editor.defineTheme('d2-light', {
-                base: 'vs',
-                inherit: true,
-                rules: [
-                    { token: 'comment', foreground: '008000' },
-                    { token: 'string', foreground: 'A31515' },
-                    { token: 'string.markdown', foreground: 'A31515', fontStyle: 'italic' },
-                    { token: 'keyword', foreground: '0000FF' },
-                    { token: 'type', foreground: '267F99' },
-                    { token: 'attribute', foreground: '001080' },
-                    { token: 'operator', foreground: '795E26' },
-                    { token: 'constant', foreground: '098658' },
-                    { token: 'identifier', foreground: '1E1E1E' },
-                ],
-                colors: {}
-            });
-
             editor = monaco.editor.create(document.getElementById('editor'), {
                 value: '# Loading...',
                 language: 'd2',
-                theme: isDarkTheme ? 'd2-dark' : 'd2-light',
+                theme: 'd2-dark',
                 automaticLayout: true,
                 minimap: { enabled: false },
                 fontSize: 14,
@@ -1133,54 +1066,6 @@
             }, 2000);
         }
 
-        // Theme toggle
-        function toggleTheme() {
-            isDarkTheme = !isDarkTheme;
-            applyTheme();
-            localStorage.setItem('theme', isDarkTheme ? 'dark' : 'light');
-        }
-
-        function applyTheme() {
-            const themeBtn = document.getElementById('themeToggleBtn');
-
-            if (isDarkTheme) {
-                document.body.classList.remove('light-theme');
-                themeBtn.textContent = 'Light';
-            } else {
-                document.body.classList.add('light-theme');
-                themeBtn.textContent = 'Dark';
-            }
-
-            // Update Monaco editor theme
-            if (editor) {
-                monaco.editor.setTheme(isDarkTheme ? 'd2-dark' : 'd2-light');
-            }
-
-            // Update JointJS paper
-            if (paper) {
-                const colors = getThemeColors();
-                paper.drawBackground({ color: colors.bgTertiary });
-                paper.setGrid({ name: 'dot', args: { color: colors.gridColor } });
-                paper.drawGrid();
-
-                // Update existing elements
-                graph.getElements().forEach(el => {
-                    el.attr('body/fill', colors.nodeFill);
-                    el.attr('body/stroke', colors.nodeStroke);
-                    el.attr('label/fill', colors.textPrimary);
-                });
-
-                // Update existing links
-                graph.getLinks().forEach(link => {
-                    link.attr('line/stroke', colors.linkStroke);
-                    link.attr('line/targetMarker/fill', colors.linkStroke);
-                    if (link.attr('line/sourceMarker')) {
-                        link.attr('line/sourceMarker/fill', colors.linkStroke);
-                    }
-                });
-            }
-        }
-
         // Undo/Redo
         function undo() {
             if (commandManager && commandManager.hasUndo()) {
@@ -1292,12 +1177,6 @@
                         resetLayout();
                     }
                     break;
-                case 't':
-                case 'T':
-                    if (!e.ctrlKey && !e.metaKey) {
-                        toggleTheme();
-                    }
-                    break;
             }
         });
 
@@ -1311,14 +1190,6 @@
                     filePath.title = data.filePath;
                 }
             });
-
-        // Update theme button text on load
-        document.addEventListener('DOMContentLoaded', () => {
-            const themeBtn = document.getElementById('themeToggleBtn');
-            if (themeBtn) {
-                themeBtn.textContent = isDarkTheme ? 'Light' : 'Dark';
-            }
-        });
     </script>
 </body>
 </html>

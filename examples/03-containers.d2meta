@@ -1,10 +1,5 @@
 {
   "version": 1,
-  "positions": {
-    "aws.vpc.private": {
-      "dx": 3,
-      "dy": -1
-    }
-  },
+  "positions": {},
   "sourceHash": "20898079878da6c7"
 }
