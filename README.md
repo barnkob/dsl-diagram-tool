@@ -261,6 +261,9 @@ diagtool serve diagram.d2
 | `2` | Export as PNG |
 | `3` | Export as PDF |
 | `R` | Reset layout |
+| `T` | Toggle light/dark mode |
+| `Ctrl+Z` | Undo (diagram changes) |
+| `Ctrl+Shift+Z` | Redo (diagram changes) |
 | `Escape` | Deselect edges |
 | `Ctrl+S` | Save file (in editor) |
 
