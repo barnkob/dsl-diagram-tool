@@ -1,5 +1,38 @@
 {
   "version": 1,
-  "positions": {},
+  "positions": {
+    "aws.vpc.private": {
+      "dx": 3,
+      "dy": -1
+    },
+    "aws.vpc.private.database": {
+      "dx": -2,
+      "dy": 3
+    },
+    "aws.vpc.private.database.primary": {
+      "dx": -2,
+      "dy": 3
+    },
+    "aws.vpc.private.webserver1": {
+      "dx": 163,
+      "dy": 29
+    },
+    "aws.vpc.private.webserver2": {
+      "dx": 356,
+      "dy": 39
+    }
+  },
+  "vertices": {
+    "aws.vpc.private.(webserver1 -\u003e database.primary)[0]": [
+      {
+        "x": 90,
+        "y": 780
+      },
+      {
+        "x": 90,
+        "y": 899
+      }
+    ]
+  },
   "sourceHash": "20898079878da6c7"
 }
