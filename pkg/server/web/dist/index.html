@@ -272,7 +272,11 @@
             <div class="toolbar">
                 <button id="saveBtn" disabled>Save (Ctrl+S)</button>
                 <span style="border-left: 1px solid #555; height: 20px; margin: 0 4px;"></span>
-                <button id="resetLayoutBtn" class="secondary" onclick="resetLayout()" title="Reset to D2 auto-layout">Reset Layout</button>
+                <button id="resetLayoutBtn" class="secondary" onclick="resetLayout()" title="Reset to D2 auto-layout (R)">Reset Layout</button>
+                <span style="border-left: 1px solid #555; height: 20px; margin: 0 4px;"></span>
+                <button id="exportSvgBtn" class="secondary" onclick="exportDiagram('svg')" title="Export as SVG (1)">SVG</button>
+                <button id="exportPngBtn" class="secondary" onclick="exportDiagram('png')" title="Export as PNG (2)">PNG</button>
+                <button id="exportPdfBtn" class="secondary" onclick="exportDiagram('pdf')" title="Export as PDF (3)">PDF</button>
             </div>
             <div id="editor"></div>
         </div>
@@ -815,6 +819,9 @@
                         break;
                     case 'position-saved':
                         break;
+                    case 'exported':
+                        handleExported(msg);
+                        break;
                 }
             };
         }
@@ -897,6 +904,44 @@
             ws.send(JSON.stringify({ type: 'clear-positions' }));
         }
 
+        function exportDiagram(format) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                showToast('Not connected', 'warning');
+                return;
+            }
+            const source = editor.getValue();
+            showToast('Exporting ' + format.toUpperCase() + '...', '');
+            ws.send(JSON.stringify({ type: 'export', format: format, source: source }));
+        }
+
+        function handleExported(msg) {
+            // Decode base64 data
+            const binaryString = atob(msg.data);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+
+            // Create blob and download
+            let mimeType = 'application/octet-stream';
+            if (msg.format === 'svg') mimeType = 'image/svg+xml';
+            else if (msg.format === 'png') mimeType = 'image/png';
+            else if (msg.format === 'pdf') mimeType = 'application/pdf';
+
+            const blob = new Blob([bytes], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = msg.filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast(msg.format.toUpperCase() + ' exported', 'success');
+        }
+
         function showError(error) {
             const formatted = error.replace(/line (\d+)/gi, '<strong>line $1</strong>');
             errorContent.innerHTML = formatted;
@@ -943,6 +988,45 @@
 
         // Save button click
         saveBtn.addEventListener('click', save);
+
+        // Global keyboard shortcuts (when not focused on editor)
+        document.addEventListener('keydown', (e) => {
+            // Skip if focused on editor (Monaco handles its own shortcuts)
+            if (document.activeElement && document.activeElement.closest('#editor')) {
+                return;
+            }
+
+            switch (e.key) {
+                case 'Escape':
+                    // Deselect all edges
+                    graph.getLinks().forEach(link => {
+                        const view = paper.findViewByModel(link);
+                        if (view) view.removeTools();
+                    });
+                    break;
+                case '1':
+                    if (!e.ctrlKey && !e.metaKey) {
+                        exportDiagram('svg');
+                    }
+                    break;
+                case '2':
+                    if (!e.ctrlKey && !e.metaKey) {
+                        exportDiagram('png');
+                    }
+                    break;
+                case '3':
+                    if (!e.ctrlKey && !e.metaKey) {
+                        exportDiagram('pdf');
+                    }
+                    break;
+                case 'r':
+                case 'R':
+                    if (!e.ctrlKey && !e.metaKey) {
+                        resetLayout();
+                    }
+                    break;
+            }
+        });
 
         // Fetch file path on load
         fetch('/api/file')
