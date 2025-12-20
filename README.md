@@ -252,6 +252,17 @@ diagtool serve diagram.d2
 - **Move vertices** - Drag the vertex circles to reshape edge routing
 - **Remove vertices** - Double-click a vertex to remove it
 - **Real-time sync** - Changes are saved automatically to a `.d2meta` file
+- **Export** - Click SVG/PNG/PDF buttons or use keyboard shortcuts
+
+**Keyboard Shortcuts** (when focus is on the canvas):
+| Key | Action |
+|-----|--------|
+| `1` | Export as SVG |
+| `2` | Export as PNG |
+| `3` | Export as PDF |
+| `R` | Reset layout |
+| `Escape` | Deselect edges |
+| `Ctrl+S` | Save file (in editor) |
 
 The D2 source file remains unchanged - all layout customizations are stored separately in `.d2meta` files.
 
