@@ -4,8 +4,8 @@ A production-ready command-line tool for rendering D2 diagrams to multiple outpu
 
 ## Project Status
 
-**Current Version:** v1.0.0
-**Status:** ✅ Production Ready - Full CLI with SVG/PNG/PDF Export
+**Current Version:** v1.2.0
+**Status:** ✅ Production Ready - Full CLI with SVG/PNG/PDF Export + Browser Editor
 
 ## Features
 
@@ -25,6 +25,13 @@ A production-ready command-line tool for rendering D2 diagrams to multiple outpu
 - Auto-format detection from file extension
 - D2 syntax validation
 - Comprehensive CLI with help system
+
+✅ **Browser-Based Editor**
+- Interactive diagram editing at http://localhost:8080
+- Drag-and-drop node positioning
+- Click edges to add/move/remove vertices (bend points)
+- Real-time sync with D2 source file
+- Layout changes persist to `.d2meta` files
 
 ✅ **High Quality Output**
 - Proper font rendering (via headless Chrome)
@@ -228,11 +235,34 @@ diagtool render architecture.d2 --watch -o output.svg
 # Press Ctrl+C to stop watching
 ```
 
+### Browser-Based Editor
+
+The `serve` command launches an interactive browser-based editor powered by [JointJS](https://www.jointjs.com/):
+
+```bash
+# Start the editor server
+diagtool serve diagram.d2
+
+# Opens http://localhost:8080 in your browser
+```
+
+**Interactive Features:**
+- **Drag nodes** - Click and drag any node to reposition it
+- **Add vertices** - Click an edge to select it, then click on the edge path to add a bend point
+- **Move vertices** - Drag the vertex circles to reshape edge routing
+- **Remove vertices** - Double-click a vertex to remove it
+- **Real-time sync** - Changes are saved automatically to a `.d2meta` file
+
+The D2 source file remains unchanged - all layout customizations are stored separately in `.d2meta` files.
+
 ### All Commands
 
 ```bash
 # Render command
 diagtool render <input.d2> [flags]
+
+# Serve command (browser editor)
+diagtool serve <input.d2> [--port 8080]
 
 # Validate command
 diagtool validate <input.d2> [-v|--verbose]
@@ -357,19 +387,30 @@ make clean && make build
 
 ## Roadmap
 
-### v1.0 (Current) ✅
+### v1.0 ✅
 - SVG, PNG, PDF export
 - Watch mode
 - Comprehensive CLI
 - Full test coverage
 
-### Future Enhancements
+### v1.1 ✅
+- Browser-based editor with live preview
+- Server mode with WebSocket sync
 - Metadata layer for position overrides
-- Visual editor integration
+
+### v1.2 (Current) ✅
+- JointJS-based interactive editor
+- Drag-and-drop node positioning
+- Edge vertex manipulation (bend points)
+- Real-time layout persistence
+
+### Future Enhancements
+- Export buttons in browser editor
+- Keyboard shortcuts for editor
+- Orthogonal edge routing
 - Additional layout engines (ELK, TALA)
 - Batch processing
 - Custom paper sizes for PDF
-- Server mode with HTTP API
 
 ## License
 
@@ -380,6 +421,7 @@ Copyright (c) 2025 Mark Barnkob
 ## Acknowledgments
 
 - [D2](https://d2lang.com/) - The excellent diagramming language by Terrastruct
+- [JointJS](https://www.jointjs.com/) - JavaScript diagramming library for browser editor
 - [Cobra](https://github.com/spf13/cobra) - CLI framework
 - [chromedp](https://github.com/chromedp/chromedp) - Headless Chrome automation
 
@@ -392,6 +434,6 @@ Copyright (c) 2025 Mark Barnkob
 
 ---
 
-**Version:** 1.0.0
-**Last Updated:** 2025-12-14
+**Version:** 1.2.0
+**Last Updated:** 2025-12-20
 **Status:** Production Ready
