@@ -1,8 +1,8 @@
 # Session: C4 Model Support
 
 **Date:** 2025-12-21
-**Latest Release:** v1.8.0 (in progress on wp-c4-theme branch)
-**Status:** C4 theme classes implemented
+**Latest Release:** v1.11.0
+**Status:** All C4 features complete
 
 ## Goal
 
@@ -39,6 +39,63 @@ We will use D2's built-in C4 support rather than implementing our own C4 layer. 
 2. D2 renders to SVG with C4-specific shapes
 3. Our canvas detects and renders these shapes in JointJS
 4. Position/vertex metadata works the same as other shapes
+
+### C4 Element Description Format
+
+C4 diagrams follow the Structurizr notation where each element displays:
+1. **Name** - The element's identifier (top line, bold)
+2. **[Type]** - The element type in brackets (e.g., `[Person]`, `[Software System]`, `[Container: Java]`)
+3. **Description** - Multi-line text explaining what the element does
+
+**References:**
+- [Structurizr Notation Guide](https://docs.structurizr.com/ui/diagrams/notation)
+- [D2 C4 Blog Post](https://d2lang.com/blog/c4/)
+
+**D2 Syntax for C4 Descriptions:**
+
+Use multi-line labels with `\n` escape sequences:
+
+```d2
+customer: "Customer\n[Person]\nA customer of the bank\nwith personal accounts" {
+  class: c4-person
+}
+
+banking: "Internet Banking System\n[Software System]\nAllows customers to view\naccount balances" {
+  class: c4-system
+}
+
+database: "Database\n[Container: PostgreSQL]\nStores user accounts and\ntransaction history" {
+  class: c4-container
+  shape: cylinder
+}
+```
+
+**SVG Rendering:**
+
+D2 renders multi-line labels as `<text>` elements with multiple `<tspan>` children:
+
+```svg
+<text x="113" y="116" fill="white">
+  <tspan x="113" dy="0">Customer</tspan>
+  <tspan x="113" dy="17">[Person]</tspan>
+  <tspan x="113" dy="17">A customer of the bank</tspan>
+  <tspan x="113" dy="17">with personal accounts</tspan>
+</text>
+```
+
+Our `extractLabel()` function (v1.10.0) already handles this by joining tspan contents with newlines.
+
+**Edge Labels with Brackets:**
+
+Edge labels containing brackets must be quoted to avoid D2 parsing issues:
+
+```d2
+# This works:
+api -> db: "Reads/writes via\n[SQL/TCP]"
+
+# This fails (unquoted brackets):
+api -> db: Reads/writes via\n[SQL/TCP]
+```
 
 ### Key Architectural Decision: Extract Paths from D2's SVG
 
@@ -357,6 +414,11 @@ make build
 - [x] Sort nodes by hierarchy level for proper z-ordering
 - [x] Containers render behind their children
 - [x] Nested elements (e.g., outer.inner) display correctly
+
+**v1.12.0 - C4 Element Descriptions** (pending release)
+- [x] Update C4 examples with proper Name/[Type]/Description format
+- [x] Document C4 element description syntax
+- [x] Fix edge labels with brackets (must be quoted)
 
 ### Pending / Future Ideas
 - (none currently)
