@@ -947,9 +947,17 @@
                     if (path && decoded.includes('(') && /\)\[\d+\]$/.test(decoded)) {
                         const parsed = parseEdgeId(decoded);
                         if (parsed) {
-                            // Extract edge label from text element
+                            // Extract edge label from text element (with multi-line support)
                             const textEl = g.querySelector('text');
-                            const label = textEl ? textEl.textContent : '';
+                            let label = '';
+                            if (textEl) {
+                                const tspans = textEl.querySelectorAll('tspan');
+                                if (tspans.length > 1) {
+                                    label = Array.from(tspans).map(t => t.textContent || '').join('\n');
+                                } else {
+                                    label = textEl.textContent || '';
+                                }
+                            }
 
                             edges.push({
                                 id: decoded,
@@ -974,6 +982,12 @@
         function extractLabel(group) {
             const textEl = group.querySelector('text');
             if (textEl) {
+                // Check for multi-line text (multiple tspan elements)
+                const tspans = textEl.querySelectorAll('tspan');
+                if (tspans.length > 1) {
+                    // Join tspan contents with newlines
+                    return Array.from(tspans).map(t => t.textContent || '').join('\n');
+                }
                 return textEl.textContent || '';
             }
             return '';

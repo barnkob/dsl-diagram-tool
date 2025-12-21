@@ -140,10 +140,10 @@ type WSMessage struct {
 	AllRoutingMode map[string]string `json:"allRoutingMode,omitempty"` // For positions: all routing modes
 
 	// Label position fields
-	LabelDistance      float64                  `json:"labelDistance,omitempty"`      // For label-position: distance along edge (0-1)
-	LabelOffsetX       float64                  `json:"labelOffsetX,omitempty"`       // For label-position: X offset
-	LabelOffsetY       float64                  `json:"labelOffsetY,omitempty"`       // For label-position: Y offset
-	AllLabelPositions  map[string]LabelPosition `json:"allLabelPositions,omitempty"`  // For positions: all label positions
+	LabelDistance     float64                  `json:"labelDistance,omitempty"`     // For label-position: distance along edge (0-1)
+	LabelOffsetX      float64                  `json:"labelOffsetX,omitempty"`      // For label-position: X offset
+	LabelOffsetY      float64                  `json:"labelOffsetY,omitempty"`      // For label-position: Y offset
+	AllLabelPositions map[string]LabelPosition `json:"allLabelPositions,omitempty"` // For positions: all label positions
 }
 
 // handleWebSocket handles WebSocket connections.
