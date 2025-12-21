@@ -320,8 +320,12 @@ make build
 - [x] Render edge labels on JointJS links with proper positioning
 - [x] Sync all changes to export.html for CLI consistency
 
-### Pending
-- [ ] Consider creating a proper C4 theme with official C4 colors
+### Pending / Future Ideas
+- [ ] C4 theme with official colors (Person=#08427b, Container=#438dd5, etc.)
+- [ ] Edge label repositioning (drag to move, store in .d2meta)
+- [ ] Multi-line label support (D2 markdown labels)
+- [ ] Container/group support (nested D2 elements)
+- [ ] Browser export buttons (PNG/PDF download from toolbar)
 
 ## Notes
 
