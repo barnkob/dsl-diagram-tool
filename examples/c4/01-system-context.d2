@@ -1,0 +1,36 @@
+# C4 System Context Diagram
+# Shows how users interact with the system and external dependencies
+#
+# Usage:
+#   diagtool render examples/c4/01-system-context.d2 --c4 -o context.svg
+#   diagtool serve examples/c4/01-system-context.d2 --c4
+
+# Actors
+customer: Customer {
+  shape: c4-person
+  style.fill: "#08427b"
+  style.font-color: white
+}
+
+# Primary System
+banking: Internet Banking System {
+  style.fill: "#1168bd"
+  style.font-color: white
+}
+
+# External Systems
+email: E-mail System {
+  style.fill: "#999999"
+  style.font-color: white
+}
+
+mainframe: Mainframe Banking System {
+  style.fill: "#999999"
+  style.font-color: white
+}
+
+# Relationships
+customer -> banking: Views account balances\nand makes payments using
+banking -> email: Sends e-mails using
+banking -> mainframe: Gets account information\nand makes payments using
+email -> customer: Sends e-mails to

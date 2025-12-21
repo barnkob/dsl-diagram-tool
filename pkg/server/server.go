@@ -19,6 +19,7 @@ type Server struct {
 	// Configuration
 	Port     int
 	FilePath string // Path to the D2 file being edited
+	C4Mode   bool   // If true, apply C4 diagram styling
 
 	// Internal state
 	httpServer *http.Server
@@ -41,6 +42,7 @@ type Options struct {
 	Port     int
 	FilePath string
 	DevMode  bool // If true, serve from filesystem instead of embedded
+	C4Mode   bool // If true, apply C4 diagram styling (Terminal theme)
 }
 
 // New creates a new server instance.
@@ -52,6 +54,7 @@ func New(opts Options) (*Server, error) {
 	s := &Server{
 		Port:     opts.Port,
 		FilePath: opts.FilePath,
+		C4Mode:   opts.C4Mode,
 		clients:  make(map[*websocket.Conn]bool),
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {

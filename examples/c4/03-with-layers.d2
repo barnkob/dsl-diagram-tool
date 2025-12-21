@@ -1,0 +1,112 @@
+# C4 with Layers - Drill-down Navigation
+# Click on elements to navigate to detailed views
+#
+# Usage:
+#   diagtool render examples/c4/03-with-layers.d2 --c4 -o layered.svg
+#   diagtool serve examples/c4/03-with-layers.d2 --c4
+#
+# Note: Layers create clickable drill-down in SVG output
+
+# System Context Level
+customer: Customer {
+  shape: c4-person
+  style.fill: "#08427b"
+  style.font-color: white
+  tooltip: "Click to see how the customer interacts with containers"
+  link: layers.containers
+}
+
+system: Banking System {
+  style.fill: "#1168bd"
+  style.font-color: white
+  tooltip: "Click to see internal containers"
+  link: layers.containers
+}
+
+external: External Systems {
+  style.fill: "#999999"
+  style.font-color: white
+}
+
+customer -> system: Uses
+system -> external: Integrates with
+
+# Container Level (Layer)
+layers: {
+  containers: {
+    # Re-declare customer for context
+    customer: Customer {
+      shape: c4-person
+      style.fill: "#08427b"
+      style.font-color: white
+    }
+
+    # Container boundary
+    system: Banking System {
+      style.stroke: "#1168bd"
+      style.stroke-width: 2
+      style.fill: transparent
+
+      webapp: Web Application {
+        style.fill: "#1168bd"
+        style.font-color: white
+        tooltip: "Click for component details"
+        link: layers.components
+      }
+
+      api: API Gateway {
+        style.fill: "#1168bd"
+        style.font-color: white
+      }
+
+      accounts: Account Service {
+        style.fill: "#1168bd"
+        style.font-color: white
+      }
+
+      db: Database {
+        shape: cylinder
+        style.fill: "#1168bd"
+        style.font-color: white
+      }
+
+      webapp -> api: REST calls
+      api -> accounts: Internal API
+      accounts -> db: SQL
+    }
+
+    customer -> system.webapp: HTTPS
+  }
+
+  # Component Level (Layer)
+  components: {
+    webapp: Web Application Components {
+      style.stroke: "#1168bd"
+      style.stroke-width: 2
+      style.fill: transparent
+
+      controller: Auth Controller {
+        style.fill: "#85bbf0"
+      }
+
+      service: User Service {
+        style.fill: "#85bbf0"
+      }
+
+      repo: User Repository {
+        style.fill: "#85bbf0"
+      }
+
+      controller -> service: Uses
+      service -> repo: Uses
+    }
+
+    db: Database {
+      shape: cylinder
+      style.fill: "#1168bd"
+      style.font-color: white
+    }
+
+    webapp.repo -> db: Reads/Writes
+  }
+}

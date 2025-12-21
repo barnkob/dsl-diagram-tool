@@ -1,0 +1,54 @@
+# C4 Container Diagram
+# Shows the containers (applications/services) within a system
+#
+# Usage:
+#   diagtool render examples/c4/02-container.d2 --c4 -o container.svg
+#   diagtool serve examples/c4/02-container.d2 --c4
+
+# Actors
+customer: Customer {
+  shape: c4-person
+  style.fill: "#08427b"
+  style.font-color: white
+}
+
+# System Boundary
+banking: Internet Banking System {
+  style.stroke: "#1168bd"
+  style.stroke-width: 2
+  style.fill: transparent
+
+  # Web Application Container
+  webapp: Web Application\n[Java/Spring MVC] {
+    style.fill: "#1168bd"
+    style.font-color: white
+  }
+
+  # Single Page Application
+  spa: Single-Page App\n[JavaScript/React] {
+    style.fill: "#1168bd"
+    style.font-color: white
+  }
+
+  # API Application
+  api: API Application\n[Java/Spring Boot] {
+    style.fill: "#1168bd"
+    style.font-color: white
+  }
+
+  # Database
+  db: Database\n[PostgreSQL] {
+    shape: cylinder
+    style.fill: "#1168bd"
+    style.font-color: white
+  }
+
+  # Internal connections
+  webapp -> spa: Delivers to browser
+  spa -> api: Makes API calls to\n[JSON/HTTPS]
+  api -> db: Reads from and writes to\n[SQL/TCP]
+}
+
+# External connections
+customer -> banking.webapp: Visits\n[HTTPS]
+customer -> banking.spa: Views and interacts with

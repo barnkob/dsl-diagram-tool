@@ -27,6 +27,7 @@ var (
 	noCenter     bool
 	watchMode    bool
 	pixelDensity int
+	c4Mode       bool
 )
 
 var renderCmd = &cobra.Command{
@@ -74,6 +75,9 @@ Examples:
   diagtool render diagram.d2 --watch
   diagtool render diagram.d2 -w -o output.png
 
+  # C4 diagram mode (applies C4-friendly styling)
+  diagtool render architecture.d2 --c4
+
 Note: Format is auto-detected from output file extension (.png, .svg, .pdf).
 Use -f to explicitly override the format.`,
 	Args: cobra.ExactArgs(1),
@@ -90,6 +94,7 @@ func init() {
 	renderCmd.Flags().BoolVar(&noCenter, "no-center", false, "Don't center the diagram")
 	renderCmd.Flags().BoolVarP(&watchMode, "watch", "w", false, "Watch input file for changes and auto-regenerate")
 	renderCmd.Flags().IntVar(&pixelDensity, "pixel-density", 3, "PNG pixel density/DPI multiplier (1=standard, 2=retina, 3-4=high-DPI)")
+	renderCmd.Flags().BoolVar(&c4Mode, "c4", false, "Use C4 diagram styling (applies Terminal theme)")
 }
 
 // renderConfig holds the resolved configuration for rendering
@@ -131,9 +136,15 @@ func resolveRenderConfig(inputFile string) (*renderConfig, error) {
 	}
 
 	// Create render options
+	resolvedThemeID := themeID
+	if c4Mode && themeID == 0 {
+		// C4 mode uses Terminal theme (8) for clean, professional look
+		resolvedThemeID = 8
+	}
+
 	opts := render.Options{
 		Format:       render.Format(format),
-		ThemeID:      themeID,
+		ThemeID:      resolvedThemeID,
 		DarkMode:     darkMode,
 		Sketch:       sketchMode,
 		Padding:      padding,

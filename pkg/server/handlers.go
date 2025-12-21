@@ -50,7 +50,7 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	svg, err := renderD2(r.Context(), req.Source, req.Options)
+	svg, err := renderD2(r.Context(), req.Source, req.Options, s.C4Mode)
 	if err != nil {
 		writeJSON(w, http.StatusOK, RenderResponse{Error: err.Error()})
 		return
@@ -187,7 +187,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 		switch msg.Type {
 		case "render":
-			svg, err := renderD2(r.Context(), msg.Source, nil)
+			svg, err := renderD2(r.Context(), msg.Source, nil, s.C4Mode)
 			if err != nil {
 				conn.WriteJSON(WSMessage{
 					Type:  "error",
@@ -314,9 +314,15 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 }
 
 // renderD2 renders D2 source to SVG.
-func renderD2(ctx context.Context, source string, opts *RenderOptions) ([]byte, error) {
+func renderD2(ctx context.Context, source string, opts *RenderOptions, c4Mode bool) ([]byte, error) {
 	renderOpts := render.DefaultOptions()
 
+	// Apply C4 mode defaults (Terminal theme)
+	if c4Mode {
+		renderOpts.ThemeID = 8
+	}
+
+	// Allow explicit options to override C4 defaults
 	if opts != nil {
 		if opts.ThemeID != 0 {
 			renderOpts.ThemeID = opts.ThemeID

@@ -1,113 +1,99 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code when working on the DSL Diagram Tool.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
-A CLI tool for rendering D2 diagrams to SVG, PNG, and PDF. Wraps the D2 library with additional features like metadata overrides and batch processing.
+A CLI tool for rendering D2 diagrams to SVG, PNG, and PDF, plus a browser-based interactive editor. Wraps the D2 library with metadata overlays for position/vertex customization.
 
 ## Quick Reference
 
 ```bash
 # Build
-make build              # or: go build -o bin/diagtool ./cmd/diagtool
+make build              # Optimized build to bin/diagtool
+make build-dev          # Debug build with symbols
 
 # Test
-make test               # or: go test ./...
+make test               # Run all tests
 make verify             # fmt + vet + test
+go test ./pkg/parser/   # Test specific package
+go test -v -run TestName ./pkg/render/  # Run single test
 
 # Run
-./bin/diagtool --help
-./bin/diagtool render examples/basic.d2 -o output.svg
+./bin/diagtool render examples/01-basic-shapes.d2 -o output.svg
+./bin/diagtool serve examples/01-basic-shapes.d2   # Browser editor at :8080
 ```
 
-## Project Structure
+## Architecture
 
 ```
-cmd/diagtool/     - CLI entry point
-pkg/              - Public packages
-  parser/         - D2 parsing wrapper
-  layout/         - Layout engine integration
-  render/         - Rendering to SVG/PNG/PDF
-  metadata/       - Metadata layer for overrides
-  server/         - Browser-based editor server
-    web/dist/     - Frontend (single index.html)
-internal/         - Private packages
-  config/         - Configuration management
-testdata/         - Test fixtures
-examples/         - Example diagrams
-docs/             - Design documentation
+D2 Source (.d2) → D2 Library → SVG → Browser Editor (JointJS) → User Interactions
+                                ↓                                      ↓
+                         Metadata (.d2meta)  ←←←←←←←←←←←←←←←←←←  WebSocket sync
 ```
+
+**Key architectural decisions:**
+- D2 source files are read-only; layout customizations go to `.d2meta` sidecar files
+- Browser editor parses D2-rendered SVG into JointJS for interactive manipulation
+- Positions stored as offsets (dx, dy) from auto-layout, not absolute coordinates
+- Source hash in `.d2meta` triggers full layout clear when D2 content changes
+
+## Key Packages
+
+| Package | Purpose |
+|---------|---------|
+| `pkg/server/` | HTTP server, WebSocket handlers, metadata persistence |
+| `pkg/render/` | D2→SVG/PNG/PDF rendering, `jointjs.go` for shape parsing |
+| `pkg/parser/` | D2 source parsing wrapper |
+| `pkg/ir/` | Internal representation types (Node, Edge, Diagram) |
+
+### Server Package (`pkg/server/`)
+
+- `server.go` - HTTP server setup, file watching
+- `handlers.go` - REST API and WebSocket message handlers
+- `metadata.go` - `Metadata` struct with `Positions`, `Vertices` maps; `.d2meta` file I/O
+- `web/dist/index.html` - Single-file JointJS frontend
+
+**WebSocket message types:** `render`, `positions`, `vertices`, `file-changed`, `reset-layout`
 
 ## Git Workflow
 
-This project uses work packages (WP) for development:
+Branch naming: `wp##-short-name` (work packages)
 
-1. **Start work:** `git checkout -b wp##-short-name`
-2. **Commit often:** Use conventional commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`)
-3. **Complete work:**
-   ```bash
-   git checkout main
-   git merge wp##-short-name
-   ```
+Conventional commits: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`
 
-## Key Dependencies
-
-- **D2 Library** (`oss.terrastruct.com/d2` v0.7.1) - Core diagramming engine
-- **Cobra** (`github.com/spf13/cobra`) - CLI framework
-
-## Code Conventions
-
-- Standard Go conventions with `gofmt`
-- Table-driven tests
-- Godoc comments on exported functions
-- Keep functions focused and testable
-
-## Development Notes
-
-- See `DEVELOPMENT.md` for detailed development guide
-- Project planning docs: `~/storagebox/mark/pet-projects-ideas/Projects/DSL-Diagram-Tool.md`
-- Binary outputs to `bin/` (gitignored)
-
-## Browser Editor Features
-
-The tool includes a browser-based editor (`diagtool serve`) with interactive diagram manipulation.
-
-### Frontend (JointJS)
-
-The browser editor uses [JointJS](https://www.jointjs.com/) for diagram rendering and interaction.
-
-**Key Benefits:**
-- Built-in drag-and-drop for nodes
-- Built-in vertex (bend point) manipulation for edges
-- Professional diagramming library with extensive features
-
-### Vertices (Edge Bend Points)
-
-Design inspired by [Structurizr's diagram editor](https://docs.structurizr.com/ui/diagrams/editor). See `docs/DESIGN-vertices.md` for full details.
-
-**Architecture:**
-- Vertices stored in `.d2meta` files (not in D2 source)
-- Source hash validation clears vertices when D2 source changes
-- Edge IDs normalized to handle HTML entity encoding
-
-**Key Files:**
-- `pkg/server/metadata.go` - `Metadata` struct with `Vertices` map
-- `pkg/server/handlers.go` - WebSocket messages: `vertices`, `positions`
-- `pkg/server/web/dist/index.html` - JointJS-based frontend
-
-**Interaction Model:**
-- Click edge to select and show vertex tools
-- Click on edge path to add a vertex
-- Drag vertex circles to bend the edge
-- Double-click vertex to remove it
-- Drag nodes to reposition them
-- Click empty canvas to deselect
-
-## Current Status
-
-Check git branch and recent commits for current work package status:
+Merge to main when complete:
 ```bash
+git checkout main && git merge wp##-short-name
+```
+
+## Browser Editor (JointJS)
+
+See `docs/DESIGN-vertices.md` for detailed design.
+
+**Data flow:**
+1. Server renders D2→SVG and sends to browser
+2. Frontend parses SVG to extract node positions/sizes and edge connections
+3. JointJS graph built from parsed data + stored metadata
+4. User drags nodes/vertices → changes sent via WebSocket → saved to `.d2meta`
+
+**Interaction model:**
+- Drag nodes to reposition
+- Click edge to select, click edge path to add vertex, drag to move, double-click to remove
+
+## Dependencies
+
+- `oss.terrastruct.com/d2` v0.7.1 - D2 diagramming library
+- `github.com/spf13/cobra` - CLI framework
+- `github.com/chromedp/chromedp` - Headless Chrome for PNG/PDF export
+
+## Useful Commands
+
+```bash
+# Check current work package status
 git branch -v
 git log --oneline -10
+
+# Run browser editor with example
+make build && ./bin/diagtool serve examples/01-basic-shapes.d2
 ```

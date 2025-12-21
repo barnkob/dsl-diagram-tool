@@ -31,17 +31,22 @@ Examples:
   diagtool serve diagram.d2 --port 3000
 
   # Start without a file (empty editor)
-  diagtool serve`,
+  diagtool serve
+
+  # C4 diagram mode (applies C4-friendly styling)
+  diagtool serve architecture.d2 --c4`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runServe,
 }
 
 var (
-	servePort int
+	servePort   int
+	serveC4Mode bool
 )
 
 func init() {
 	serveCmd.Flags().IntVarP(&servePort, "port", "p", 8080, "port to listen on")
+	serveCmd.Flags().BoolVar(&serveC4Mode, "c4", false, "Use C4 diagram styling (applies Terminal theme)")
 	rootCmd.AddCommand(serveCmd)
 }
 
@@ -58,6 +63,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	srv, err := server.New(server.Options{
 		Port:     servePort,
 		FilePath: filePath,
+		C4Mode:   serveC4Mode,
 	})
 	if err != nil {
 		return err
