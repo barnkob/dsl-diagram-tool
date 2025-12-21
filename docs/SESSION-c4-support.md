@@ -353,8 +353,13 @@ make build
 - [x] Preserve line breaks in node and edge labels
 - [x] JointJS renders labels with proper line wrapping
 
+**v1.11.0 - Container/Group Support**
+- [x] Sort nodes by hierarchy level for proper z-ordering
+- [x] Containers render behind their children
+- [x] Nested elements (e.g., outer.inner) display correctly
+
 ### Pending / Future Ideas
-- [ ] Container/group support (nested D2 elements)
+- (none currently)
 
 ### Already Implemented (not previously tracked)
 - [x] Browser export buttons (SVG/PNG/PDF) - keyboard shortcuts 1/2/3
