@@ -6,7 +6,7 @@
 #   diagtool serve examples/c4/02-container.d2 --c4
 
 # Actors
-customer: Customer {
+customer: "Customer\n[Person]\nA customer of the bank\nwith personal accounts" {
   shape: c4-person
   style.fill: "#08427b"
   style.font-color: white
@@ -19,25 +19,25 @@ banking: Internet Banking System {
   style.fill: transparent
 
   # Web Application Container
-  webapp: Web Application\n[Java/Spring MVC] {
+  webapp: "Web Application\n[Container: Java/Spring MVC]\nDelivers static content\nand the SPA" {
     style.fill: "#1168bd"
     style.font-color: white
   }
 
   # Single Page Application
-  spa: Single-Page App\n[JavaScript/React] {
+  spa: "Single-Page App\n[Container: JavaScript/React]\nProvides banking\nfunctionality via browser" {
     style.fill: "#1168bd"
     style.font-color: white
   }
 
   # API Application
-  api: API Application\n[Java/Spring Boot] {
+  api: "API Application\n[Container: Java/Spring Boot]\nProvides banking\nfunctionality via JSON/HTTPS" {
     style.fill: "#1168bd"
     style.font-color: white
   }
 
   # Database
-  db: Database\n[PostgreSQL] {
+  db: "Database\n[Container: PostgreSQL]\nStores user accounts,\ncredentials, and transactions" {
     shape: cylinder
     style.fill: "#1168bd"
     style.font-color: white
@@ -45,10 +45,10 @@ banking: Internet Banking System {
 
   # Internal connections
   webapp -> spa: Delivers to browser
-  spa -> api: Makes API calls to\n[JSON/HTTPS]
-  api -> db: Reads from and writes to\n[SQL/TCP]
+  spa -> api: "Makes API calls to\n[JSON/HTTPS]"
+  api -> db: "Reads from and writes to\n[SQL/TCP]"
 }
 
 # External connections
-customer -> banking.webapp: Visits\n[HTTPS]
+customer -> banking.webapp: "Visits\n[HTTPS]"
 customer -> banking.spa: Views and interacts with

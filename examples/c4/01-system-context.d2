@@ -6,25 +6,25 @@
 #   diagtool serve examples/c4/01-system-context.d2 --c4
 
 # Actors
-customer: Customer {
+customer: "Customer\n[Person]\nA customer of the bank\nwith personal accounts" {
   shape: c4-person
   style.fill: "#08427b"
   style.font-color: white
 }
 
 # Primary System
-banking: Internet Banking System {
+banking: "Internet Banking System\n[Software System]\nAllows customers to view\naccount balances and\nmake payments" {
   style.fill: "#1168bd"
   style.font-color: white
 }
 
 # External Systems
-email: E-mail System {
+email: "E-mail System\n[External System]\nMicrosoft Exchange\ne-mail system" {
   style.fill: "#999999"
   style.font-color: white
 }
 
-mainframe: Mainframe Banking System {
+mainframe: "Mainframe Banking System\n[External System]\nStores all core banking\ninformation" {
   style.fill: "#999999"
   style.font-color: white
 }

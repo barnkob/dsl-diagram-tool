@@ -16,29 +16,29 @@
 #   c4-external-person - External Person (gray)
 
 # Actors
-customer: Customer {
+customer: "Customer\n[Person]\nA customer of the bank\nwith personal accounts" {
   class: c4-person
 }
 
-admin: Admin User {
+admin: "Admin User\n[Person]\nAn administrator who\nmanages the system" {
   class: c4-person
 }
 
 # Primary System
-banking: Internet Banking System {
+banking: "Internet Banking System\n[Software System]\nAllows customers to view\naccount balances and\nmake payments" {
   class: c4-system
 }
 
 # External Systems
-email: E-mail System {
+email: "E-mail System\n[External System]\nMicrosoft Exchange\ne-mail system" {
   class: c4-external
 }
 
-mainframe: Mainframe Banking System {
+mainframe: "Mainframe Banking System\n[External System]\nStores all core banking\ninformation" {
   class: c4-external
 }
 
-support: External Support Team {
+support: "External Support Team\n[Person]\nProvides support for\nthe mainframe system" {
   class: c4-external-person
 }
 
