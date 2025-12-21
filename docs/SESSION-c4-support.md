@@ -342,8 +342,13 @@ make build
 - [x] Classes auto-injected when using `--c4` flag
 - [x] New examples: `04-with-theme.d2`, `05-container-theme.d2`
 
+**v1.9.0 - Edge Label Repositioning**
+- [x] Drag edge labels along the edge path or perpendicular
+- [x] Label positions stored in .d2meta as {distance, offsetX, offsetY}
+- [x] Positions persist across page refreshes
+- [x] Reset Layout clears label positions
+
 ### Pending / Future Ideas
-- [ ] Edge label repositioning (drag to move, store in .d2meta)
 - [ ] Multi-line label support (D2 markdown labels)
 - [ ] Container/group support (nested D2 elements)
 
