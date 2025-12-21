@@ -73,13 +73,31 @@ See `docs/DESIGN-vertices.md` for detailed design.
 
 **Data flow:**
 1. Server renders D2→SVG and sends to browser
-2. Frontend parses SVG to extract node positions/sizes and edge connections
+2. Frontend parses SVG to extract node positions/sizes, edge connections, colors, and labels
 3. JointJS graph built from parsed data + stored metadata
 4. User drags nodes/vertices → changes sent via WebSocket → saved to `.d2meta`
 
 **Interaction model:**
 - Drag nodes to reposition
 - Click edge to select, click edge path to add vertex, drag to move, double-click to remove
+
+**Supported shapes:** rectangle, circle, oval, diamond, hexagon, cylinder, person, c4-person, cloud
+
+**Style extraction from D2:**
+- `style.fill` → shape fill color
+- `style.stroke` → shape stroke color
+- `style.font-color` → text/label color
+- Edge labels from connection definitions (e.g., `a -> b: label text`)
+
+## C4 Diagram Support
+
+Use the `--c4` flag for C4 architecture diagrams:
+```bash
+./bin/diagtool serve examples/c4/01-system-context.d2 --c4
+./bin/diagtool render examples/c4/01-system-context.d2 --c4 -o output.svg
+```
+
+The `--c4` flag applies the Terminal theme (ID 8) for clean C4 styling. D2's native `c4-person` shape renders correctly with separate head and body.
 
 ## Dependencies
 
