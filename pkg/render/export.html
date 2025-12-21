@@ -100,6 +100,155 @@
             return '';
         }
 
+        // Extract path data from a shape element
+        function extractPathData(shapeElement) {
+            const paths = shapeElement.querySelectorAll('path');
+            if (paths.length === 0) return null;
+            return Array.from(paths).map(p => p.getAttribute('d'));
+        }
+
+        // Normalize a path: translate to origin (0,0) and scale to fit within (0,0)-(1,1)
+        function normalizePath(pathData, bbox) {
+            if (!pathData || pathData.length === 0) return null;
+            const normalized = pathData.map(d => {
+                if (!d) return '';
+                return translatePath(d, -bbox.x, -bbox.y, bbox.width, bbox.height);
+            }).join(' ');
+            return normalized;
+        }
+
+        // Translate and scale SVG path coordinates
+        function translatePath(d, offsetX, offsetY, width, height) {
+            const pathRegex = /([MLHVCSQTAZ])([^MLHVCSQTAZ]*)/gi;
+            let result = '';
+            let match;
+
+            while ((match = pathRegex.exec(d)) !== null) {
+                const cmd = match[1];
+                const args = match[2].trim();
+
+                if (cmd.toUpperCase() === 'Z') {
+                    result += cmd + ' ';
+                    continue;
+                }
+
+                const nums = args.match(/-?\d*\.?\d+/g);
+                if (!nums) {
+                    result += cmd + ' ';
+                    continue;
+                }
+
+                const scaledNums = [];
+                const cmdUpper = cmd.toUpperCase();
+
+                switch (cmdUpper) {
+                    case 'M': case 'L': case 'T':
+                        for (let i = 0; i < nums.length; i += 2) {
+                            scaledNums.push(((parseFloat(nums[i]) + offsetX) / width).toFixed(4));
+                            scaledNums.push(((parseFloat(nums[i + 1]) + offsetY) / height).toFixed(4));
+                        }
+                        break;
+                    case 'H':
+                        for (let i = 0; i < nums.length; i++) {
+                            scaledNums.push(((parseFloat(nums[i]) + offsetX) / width).toFixed(4));
+                        }
+                        break;
+                    case 'V':
+                        for (let i = 0; i < nums.length; i++) {
+                            scaledNums.push(((parseFloat(nums[i]) + offsetY) / height).toFixed(4));
+                        }
+                        break;
+                    case 'C': case 'S': case 'Q':
+                        for (let i = 0; i < nums.length; i += 2) {
+                            scaledNums.push(((parseFloat(nums[i]) + offsetX) / width).toFixed(4));
+                            scaledNums.push(((parseFloat(nums[i + 1]) + offsetY) / height).toFixed(4));
+                        }
+                        break;
+                    case 'A':
+                        for (let i = 0; i < nums.length; i += 7) {
+                            scaledNums.push((parseFloat(nums[i]) / width).toFixed(4));
+                            scaledNums.push((parseFloat(nums[i + 1]) / height).toFixed(4));
+                            scaledNums.push(nums[i + 2]);
+                            scaledNums.push(nums[i + 3]);
+                            scaledNums.push(nums[i + 4]);
+                            scaledNums.push(((parseFloat(nums[i + 5]) + offsetX) / width).toFixed(4));
+                            scaledNums.push(((parseFloat(nums[i + 6]) + offsetY) / height).toFixed(4));
+                        }
+                        break;
+                    default:
+                        scaledNums.push(...nums);
+                }
+
+                result += cmd + ' ' + scaledNums.join(' ') + ' ';
+            }
+
+            return result.trim();
+        }
+
+        // Scale a normalized path (0-1 coordinates) to actual pixel dimensions
+        function scalePath(normalizedPath, width, height) {
+            if (!normalizedPath) return '';
+
+            const pathRegex = /([MLHVCSQTAZ])([^MLHVCSQTAZ]*)/gi;
+            let result = '';
+            let match;
+
+            while ((match = pathRegex.exec(normalizedPath)) !== null) {
+                const cmd = match[1];
+                const args = match[2].trim();
+
+                if (cmd.toUpperCase() === 'Z') {
+                    result += cmd + ' ';
+                    continue;
+                }
+
+                const nums = args.match(/-?\d*\.?\d+/g);
+                if (!nums) {
+                    result += cmd + ' ';
+                    continue;
+                }
+
+                const scaledNums = [];
+                const cmdUpper = cmd.toUpperCase();
+
+                switch (cmdUpper) {
+                    case 'M': case 'L': case 'T': case 'C': case 'S': case 'Q':
+                        for (let i = 0; i < nums.length; i += 2) {
+                            scaledNums.push((parseFloat(nums[i]) * width).toFixed(2));
+                            scaledNums.push((parseFloat(nums[i + 1]) * height).toFixed(2));
+                        }
+                        break;
+                    case 'H':
+                        for (let i = 0; i < nums.length; i++) {
+                            scaledNums.push((parseFloat(nums[i]) * width).toFixed(2));
+                        }
+                        break;
+                    case 'V':
+                        for (let i = 0; i < nums.length; i++) {
+                            scaledNums.push((parseFloat(nums[i]) * height).toFixed(2));
+                        }
+                        break;
+                    case 'A':
+                        for (let i = 0; i < nums.length; i += 7) {
+                            scaledNums.push((parseFloat(nums[i]) * width).toFixed(2));
+                            scaledNums.push((parseFloat(nums[i + 1]) * height).toFixed(2));
+                            scaledNums.push(nums[i + 2]);
+                            scaledNums.push(nums[i + 3]);
+                            scaledNums.push(nums[i + 4]);
+                            scaledNums.push((parseFloat(nums[i + 5]) * width).toFixed(2));
+                            scaledNums.push((parseFloat(nums[i + 6]) * height).toFixed(2));
+                        }
+                        break;
+                    default:
+                        scaledNums.push(...nums);
+                }
+
+                result += cmd + ' ' + scaledNums.join(' ') + ' ';
+            }
+
+            return result.trim();
+        }
+
         // Detect shape type from D2 SVG element
         function detectShapeType(shapeElement) {
             // Check for ellipse (circle or oval)
@@ -294,44 +443,48 @@
         });
 
         // C4-Person shape - separate head circle + rounded rectangle body (C4 architecture style)
+        // Uses extracted path from D2 SVG when available for exact visual match
         ShapeRegistry.register('c4-person', (opts) => {
             const w = opts.width;
             const h = opts.height;
-            // C4 person proportions (derived from D2's SVG output):
-            // - Head is positioned above body with small gap
-            // - Body is a rounded rectangle that takes most of the width
-            // - Label appears inside the body
-            const headRadius = h * 0.15;
-            const headCX = w / 2;
-            const headCY = headRadius;
-            const gap = h * 0.03;
-            const bodyTop = headRadius * 2 + gap;
-            const bodyMargin = w * 0.1;  // Body narrower than full width
-            const bodyLeft = bodyMargin;
-            const bodyRight = w - bodyMargin;
-            const bodyBottom = h;
-            const bodyHeight = bodyBottom - bodyTop;
-            const cornerRadius = Math.min(bodyHeight * 0.15, 10);
 
-            // Calculate body center for label positioning
-            const bodyCenterY = (bodyTop + bodyBottom) / 2;
+            let d;
+            if (opts.normalizedPath) {
+                // Use the path extracted from D2's SVG, scaled to current dimensions
+                d = scalePath(opts.normalizedPath, w, h);
+            } else {
+                // Fallback: hardcoded proportions
+                const headRadius = h * 0.15;
+                const headCX = w / 2;
+                const headCY = headRadius;
+                const gap = h * 0.03;
+                const bodyTop = headRadius * 2 + gap;
+                const bodyMargin = w * 0.1;
+                const bodyLeft = bodyMargin;
+                const bodyRight = w - bodyMargin;
+                const bodyBottom = h;
+                const bodyHeight = bodyBottom - bodyTop;
+                const cornerRadius = Math.min(bodyHeight * 0.15, 10);
 
-            // Head circle + body rounded rectangle as separate shapes
-            const d = `
-                M ${headCX + headRadius} ${headCY}
-                A ${headRadius} ${headRadius} 0 1 0 ${headCX - headRadius} ${headCY}
-                A ${headRadius} ${headRadius} 0 1 0 ${headCX + headRadius} ${headCY}
-                M ${bodyLeft + cornerRadius} ${bodyTop}
-                L ${bodyRight - cornerRadius} ${bodyTop}
-                Q ${bodyRight} ${bodyTop} ${bodyRight} ${bodyTop + cornerRadius}
-                L ${bodyRight} ${bodyBottom - cornerRadius}
-                Q ${bodyRight} ${bodyBottom} ${bodyRight - cornerRadius} ${bodyBottom}
-                L ${bodyLeft + cornerRadius} ${bodyBottom}
-                Q ${bodyLeft} ${bodyBottom} ${bodyLeft} ${bodyBottom - cornerRadius}
-                L ${bodyLeft} ${bodyTop + cornerRadius}
-                Q ${bodyLeft} ${bodyTop} ${bodyLeft + cornerRadius} ${bodyTop}
-                Z
-            `.replace(/\s+/g, ' ').trim();
+                d = `
+                    M ${headCX + headRadius} ${headCY}
+                    A ${headRadius} ${headRadius} 0 1 0 ${headCX - headRadius} ${headCY}
+                    A ${headRadius} ${headRadius} 0 1 0 ${headCX + headRadius} ${headCY}
+                    M ${bodyLeft + cornerRadius} ${bodyTop}
+                    L ${bodyRight - cornerRadius} ${bodyTop}
+                    Q ${bodyRight} ${bodyTop} ${bodyRight} ${bodyTop + cornerRadius}
+                    L ${bodyRight} ${bodyBottom - cornerRadius}
+                    Q ${bodyRight} ${bodyBottom} ${bodyRight - cornerRadius} ${bodyBottom}
+                    L ${bodyLeft + cornerRadius} ${bodyBottom}
+                    Q ${bodyLeft} ${bodyBottom} ${bodyLeft} ${bodyBottom - cornerRadius}
+                    L ${bodyLeft} ${bodyTop + cornerRadius}
+                    Q ${bodyLeft} ${bodyTop} ${bodyLeft + cornerRadius} ${bodyTop}
+                    Z
+                `.replace(/\s+/g, ' ').trim();
+            }
+
+            // Label positioned in body area (lower 60% of height)
+            const bodyCenterY = h * 0.7;
 
             return new joint.shapes.standard.Path({
                 position: { x: opts.x, y: opts.y },
@@ -409,6 +562,10 @@
                     if (shape && !decoded.startsWith('(')) {
                         const bbox = shape.getBBox();
                         if (bbox.width > 0 && bbox.height > 0) {
+                            const shapeType = detectShapeType(shape);
+                            const pathData = extractPathData(shape);
+                            const normalizedPath = normalizePath(pathData, bbox);
+
                             nodes.push({
                                 id: decoded,
                                 x: bbox.x,
@@ -416,7 +573,9 @@
                                 width: bbox.width,
                                 height: bbox.height,
                                 label: extractLabel(g),
-                                shapeType: detectShapeType(shape)
+                                shapeType: shapeType,
+                                pathData: pathData,
+                                normalizedPath: normalizedPath
                             });
                         }
                         break;
@@ -464,7 +623,8 @@
                     label: node.label,
                     fill: canvasColors.nodeFill,
                     stroke: canvasColors.nodeStroke,
-                    textColor: canvasColors.nodeText
+                    textColor: canvasColors.nodeText,
+                    normalizedPath: node.normalizedPath
                 });
 
                 element.set('nodeId', node.id);
