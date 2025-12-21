@@ -348,8 +348,12 @@ make build
 - [x] Positions persist across page refreshes
 - [x] Reset Layout clears label positions
 
+**v1.10.0 - Multi-line Label Support**
+- [x] Extract multi-line text from D2 SVG tspan elements
+- [x] Preserve line breaks in node and edge labels
+- [x] JointJS renders labels with proper line wrapping
+
 ### Pending / Future Ideas
-- [ ] Multi-line label support (D2 markdown labels)
 - [ ] Container/group support (nested D2 elements)
 
 ### Already Implemented (not previously tracked)
