@@ -346,7 +346,9 @@ make build
 - [ ] Edge label repositioning (drag to move, store in .d2meta)
 - [ ] Multi-line label support (D2 markdown labels)
 - [ ] Container/group support (nested D2 elements)
-- [ ] Browser export buttons (PNG/PDF download from toolbar)
+
+### Already Implemented (not previously tracked)
+- [x] Browser export buttons (SVG/PNG/PDF) - keyboard shortcuts 1/2/3
 
 ## Notes
 
