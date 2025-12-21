@@ -367,3 +367,15 @@ func (s *Server) SetRoutingMode(edgeID string, mode string) error {
 	}
 	return nil
 }
+
+// SetLabelPosition updates an edge label's position and saves metadata.
+func (s *Server) SetLabelPosition(edgeID string, distance, offsetX, offsetY float64) error {
+	s.metadataMu.Lock()
+	s.metadata.SetLabelPosition(edgeID, distance, offsetX, offsetY)
+	s.metadataMu.Unlock()
+
+	if s.FilePath != "" {
+		return SaveMetadata(s.FilePath, s.metadata)
+	}
+	return nil
+}

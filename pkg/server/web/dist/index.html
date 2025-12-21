@@ -350,6 +350,7 @@
         let jointLinks = {};     // Map D2 edgeId -> JointJS link
         let nodePositions = {};  // Metadata positions from server
         let edgeVertices = {};   // Metadata vertices from server { edgeId: [{x, y}, ...] }
+        let labelPositions = {}; // Metadata label positions { edgeId: {distance, offsetX, offsetY} }
 
         // DOM elements
         const statusDot = document.getElementById('statusDot');
@@ -455,7 +456,7 @@
                 interactive: {
                     elementMove: true,
                     linkMove: false,
-                    labelMove: false,
+                    labelMove: true,
                     arrowheadMove: false,
                     vertexAdd: true,
                     vertexMove: true,
@@ -495,6 +496,37 @@
                         type: 'vertices',
                         edgeId: edgeId,
                         vertices: vertices || []
+                    }));
+                }
+            });
+
+            // Handle link label position changes
+            graph.on('change:labels', (link, labels) => {
+                const edgeId = link.get('edgeId');
+                if (!edgeId || !labels || labels.length === 0) return;
+
+                // Get the first label's position (we only support one label per edge)
+                const label = labels[0];
+                const position = label.position || {};
+                const distance = position.distance !== undefined ? position.distance : 0.5;
+                const offset = position.offset || {};
+                const offsetX = offset.x || 0;
+                const offsetY = offset.y || 0;
+
+                // Update local state
+                labelPositions[edgeId] = { distance, offsetX, offsetY };
+
+                // Update debug panel
+                updateDebug(`Label moved on ${edgeId}: distance=${distance.toFixed(2)}, offset=(${offsetX.toFixed(1)}, ${offsetY.toFixed(1)})`);
+
+                // Send to server
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'label-position',
+                        edgeId: edgeId,
+                        labelDistance: distance,
+                        labelOffsetX: offsetX,
+                        labelOffsetY: offsetY
                     }));
                 }
             });
@@ -1265,6 +1297,12 @@
 
                 // Add edge label if present
                 if (edge.label) {
+                    // Use stored label position if available, otherwise default to center
+                    const storedLabelPos = labelPositions[edge.id];
+                    const labelPosition = storedLabelPos
+                        ? { distance: storedLabelPos.distance, offset: { x: storedLabelPos.offsetX || 0, y: storedLabelPos.offsetY || 0 } }
+                        : { distance: 0.5 };
+
                     link.appendLabel({
                         attrs: {
                             text: {
@@ -1277,7 +1315,7 @@
                                 stroke: 'none'
                             }
                         },
-                        position: { distance: 0.5 }
+                        position: labelPosition
                     });
                 }
 
@@ -1414,13 +1452,16 @@
                     case 'positions':
                         nodePositions = msg.positions || {};
                         edgeVertices = msg.allVertices || {};
-                        // Re-apply positions and vertices to JointJS elements
+                        labelPositions = msg.allLabelPositions || {};
+                        // Re-apply positions, vertices, and label positions to JointJS elements
                         applyPositions();
                         applyVertices();
+                        applyLabelPositions();
                         break;
                     case 'positions-cleared':
                         nodePositions = {};
                         edgeVertices = {};
+                        labelPositions = {};
                         isFirstRender = true;  // Force full re-render
                         render();
                         showToast('Layout reset', 'success');
@@ -1429,6 +1470,9 @@
                         // Acknowledge - no action needed
                         break;
                     case 'position-saved':
+                        break;
+                    case 'label-position-saved':
+                        // Acknowledge - no action needed
                         break;
                 }
             };
@@ -1595,6 +1639,12 @@
 
                     // Add edge label if present
                     if (edge.label) {
+                        // Use stored label position if available, otherwise default to center
+                        const storedLabelPos = labelPositions[edge.id];
+                        const labelPosition = storedLabelPos
+                            ? { distance: storedLabelPos.distance, offset: { x: storedLabelPos.offsetX || 0, y: storedLabelPos.offsetY || 0 } }
+                            : { distance: 0.5 };
+
                         link.appendLabel({
                             attrs: {
                                 text: {
@@ -1607,7 +1657,7 @@
                                     stroke: 'none'
                                 }
                             },
-                            position: { distance: 0.5 }
+                            position: labelPosition
                         });
                     }
 
@@ -1642,6 +1692,23 @@
                 const link = jointLinks[edgeId];
                 if (link && vertices && vertices.length > 0) {
                     link.vertices(vertices);
+                }
+            }
+        }
+
+        function applyLabelPositions() {
+            for (const [edgeId, pos] of Object.entries(labelPositions)) {
+                const link = jointLinks[edgeId];
+                if (link) {
+                    const labels = link.labels();
+                    if (labels && labels.length > 0) {
+                        link.label(0, {
+                            position: {
+                                distance: pos.distance,
+                                offset: { x: pos.offsetX || 0, y: pos.offsetY || 0 }
+                            }
+                        });
+                    }
                 }
             }
         }

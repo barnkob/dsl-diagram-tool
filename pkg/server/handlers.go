@@ -138,6 +138,12 @@ type WSMessage struct {
 	// Routing mode fields
 	RoutingMode    string            `json:"routingMode,omitempty"`    // For routing: edge routing mode (direct, orthogonal)
 	AllRoutingMode map[string]string `json:"allRoutingMode,omitempty"` // For positions: all routing modes
+
+	// Label position fields
+	LabelDistance      float64                  `json:"labelDistance,omitempty"`      // For label-position: distance along edge (0-1)
+	LabelOffsetX       float64                  `json:"labelOffsetX,omitempty"`       // For label-position: X offset
+	LabelOffsetY       float64                  `json:"labelOffsetY,omitempty"`       // For label-position: Y offset
+	AllLabelPositions  map[string]LabelPosition `json:"allLabelPositions,omitempty"`  // For positions: all label positions
 }
 
 // handleWebSocket handles WebSocket connections.
@@ -167,14 +173,15 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	// Send initial positions, vertices, and routing modes
+	// Send initial positions, vertices, routing modes, and label positions
 	meta := s.GetMetadata()
-	if meta.HasPositions() || meta.HasVertices() || meta.HasRoutingModes() {
+	if meta.HasPositions() || meta.HasVertices() || meta.HasRoutingModes() || meta.HasLabelPositions() {
 		conn.WriteJSON(WSMessage{
-			Type:           "positions",
-			Positions:      meta.Positions,
-			AllVertices:    meta.Vertices,
-			AllRoutingMode: meta.RoutingMode,
+			Type:              "positions",
+			Positions:         meta.Positions,
+			AllVertices:       meta.Vertices,
+			AllRoutingMode:    meta.RoutingMode,
+			AllLabelPositions: meta.LabelPositions,
 		})
 	}
 
@@ -293,6 +300,30 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 				Type:        "routing-saved",
 				EdgeID:      msg.EdgeID,
 				RoutingMode: msg.RoutingMode,
+			})
+
+		case "label-position":
+			// Update edge label position
+			if msg.EdgeID == "" {
+				conn.WriteJSON(WSMessage{
+					Type:  "error",
+					Error: "edgeId is required",
+				})
+				continue
+			}
+
+			if err := s.SetLabelPosition(msg.EdgeID, msg.LabelDistance, msg.LabelOffsetX, msg.LabelOffsetY); err != nil {
+				conn.WriteJSON(WSMessage{
+					Type:  "error",
+					Error: "Failed to save label position: " + err.Error(),
+				})
+				continue
+			}
+
+			// Acknowledge label position saved
+			conn.WriteJSON(WSMessage{
+				Type:   "label-position-saved",
+				EdgeID: msg.EdgeID,
 			})
 
 		case "clear-positions":

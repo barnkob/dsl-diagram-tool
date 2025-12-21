@@ -13,11 +13,12 @@ import (
 // Metadata stores position overrides for diagram nodes and edge vertices.
 // Stored in a .d2meta file alongside the .d2 file.
 type Metadata struct {
-	Version     int                   `json:"version"`
-	Positions   map[string]NodeOffset `json:"positions"`
-	Vertices    map[string][]Vertex   `json:"vertices,omitempty"`
-	RoutingMode map[string]string     `json:"routingMode,omitempty"`
-	SourceHash  string                `json:"sourceHash"`
+	Version        int                      `json:"version"`
+	Positions      map[string]NodeOffset    `json:"positions"`
+	Vertices       map[string][]Vertex      `json:"vertices,omitempty"`
+	RoutingMode    map[string]string        `json:"routingMode,omitempty"`
+	LabelPositions map[string]LabelPosition `json:"labelPositions,omitempty"`
+	SourceHash     string                   `json:"sourceHash"`
 }
 
 // NormalizeEdgeID ensures consistent edge ID format by decoding HTML entities.
@@ -38,13 +39,22 @@ type Vertex struct {
 	Y float64 `json:"y"`
 }
 
+// LabelPosition represents the position of an edge label.
+// Distance is 0-1 along the edge path, Offset is perpendicular displacement.
+type LabelPosition struct {
+	Distance float64 `json:"distance"`
+	OffsetX  float64 `json:"offsetX,omitempty"`
+	OffsetY  float64 `json:"offsetY,omitempty"`
+}
+
 // NewMetadata creates a new empty metadata structure.
 func NewMetadata() *Metadata {
 	return &Metadata{
-		Version:     1,
-		Positions:   make(map[string]NodeOffset),
-		Vertices:    make(map[string][]Vertex),
-		RoutingMode: make(map[string]string),
+		Version:        1,
+		Positions:      make(map[string]NodeOffset),
+		Vertices:       make(map[string][]Vertex),
+		RoutingMode:    make(map[string]string),
+		LabelPositions: make(map[string]LabelPosition),
 	}
 }
 
@@ -81,6 +91,9 @@ func LoadMetadata(d2Path string) (*Metadata, error) {
 	if meta.RoutingMode == nil {
 		meta.RoutingMode = make(map[string]string)
 	}
+	if meta.LabelPositions == nil {
+		meta.LabelPositions = make(map[string]LabelPosition)
+	}
 
 	return &meta, nil
 }
@@ -109,10 +122,11 @@ func (m *Metadata) ValidateAndClean(currentSource string) bool {
 	currentHash := HashSource(currentSource)
 
 	if m.SourceHash != currentHash {
-		// Source changed, clear all positions, vertices, and routing modes
+		// Source changed, clear all positions, vertices, routing modes, and label positions
 		m.Positions = make(map[string]NodeOffset)
 		m.Vertices = make(map[string][]Vertex)
 		m.RoutingMode = make(map[string]string)
+		m.LabelPositions = make(map[string]LabelPosition)
 		m.SourceHash = currentHash
 		return true
 	}
@@ -194,4 +208,34 @@ func (m *Metadata) GetRoutingMode(edgeID string) string {
 // HasRoutingModes returns true if there are any non-default routing modes.
 func (m *Metadata) HasRoutingModes() bool {
 	return len(m.RoutingMode) > 0
+}
+
+// SetLabelPosition updates or adds a label position for an edge.
+func (m *Metadata) SetLabelPosition(edgeID string, distance, offsetX, offsetY float64) {
+	normalizedID := NormalizeEdgeID(edgeID)
+	// Only store if not default (0.5, 0, 0)
+	if distance == 0.5 && offsetX == 0 && offsetY == 0 {
+		delete(m.LabelPositions, normalizedID)
+	} else {
+		m.LabelPositions[normalizedID] = LabelPosition{
+			Distance: distance,
+			OffsetX:  offsetX,
+			OffsetY:  offsetY,
+		}
+	}
+}
+
+// GetLabelPosition returns the label position for an edge.
+// Returns default position (0.5, 0, 0) if not found.
+func (m *Metadata) GetLabelPosition(edgeID string) LabelPosition {
+	normalizedID := NormalizeEdgeID(edgeID)
+	if pos, ok := m.LabelPositions[normalizedID]; ok {
+		return pos
+	}
+	return LabelPosition{Distance: 0.5}
+}
+
+// HasLabelPositions returns true if there are any custom label positions.
+func (m *Metadata) HasLabelPositions() bool {
+	return len(m.LabelPositions) > 0
 }
