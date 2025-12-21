@@ -1,8 +1,8 @@
 # Session: C4 Model Support
 
 **Date:** 2025-12-21
-**Latest Release:** v1.7.0 (merged to main)
-**Status:** Complete - all core C4 features implemented
+**Latest Release:** v1.8.0 (in progress on wp-c4-theme branch)
+**Status:** C4 theme classes implemented
 
 ## Goal
 
@@ -331,8 +331,18 @@ make build
 - [x] Render edge labels on JointJS links with proper positioning
 - [x] Sync all changes to export.html for CLI consistency
 
+**v1.8.0 - C4 Theme Classes**
+- [x] C4 theme with Structurizr colors via D2 classes
+- [x] `c4-person` class (dark blue #08427b, c4-person shape)
+- [x] `c4-system` class (medium blue #1168bd)
+- [x] `c4-container` class (light blue #438dd5)
+- [x] `c4-component` class (lightest blue #85bbf0)
+- [x] `c4-external` class (gray #999999)
+- [x] `c4-external-person` class (gray, c4-person shape)
+- [x] Classes auto-injected when using `--c4` flag
+- [x] New examples: `04-with-theme.d2`, `05-container-theme.d2`
+
 ### Pending / Future Ideas
-- [ ] C4 theme with official colors (Person=#08427b, Container=#438dd5, etc.)
 - [ ] Edge label repositioning (drag to move, store in .d2meta)
 - [ ] Multi-line label support (D2 markdown labels)
 - [ ] Container/group support (nested D2 elements)

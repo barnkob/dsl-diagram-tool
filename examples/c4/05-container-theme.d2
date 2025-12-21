@@ -1,0 +1,41 @@
+# C4 Container Diagram (using C4 theme classes)
+#
+# Demonstrates all C4 element types with the built-in theme classes.
+#
+# Usage:
+#   diagtool render examples/c4/05-container-theme.d2 --c4 -o container.svg
+#   diagtool serve examples/c4/05-container-theme.d2 --c4
+
+# Actors
+customer: Customer {
+  class: c4-person
+}
+
+# Internet Banking System (expanded to show containers)
+banking: Internet Banking System {
+  class: c4-system
+
+  web: Web Application {
+    class: c4-container
+  }
+
+  api: API Application {
+    class: c4-container
+  }
+
+  db: Database {
+    class: c4-container
+    shape: cylinder
+  }
+}
+
+# External Systems
+mainframe: Mainframe Banking System {
+  class: c4-external
+}
+
+# Relationships
+customer -> banking.web: Uses HTTPS
+banking.web -> banking.api: Makes API calls
+banking.api -> banking.db: Reads/writes
+banking.api -> mainframe: Gets account data

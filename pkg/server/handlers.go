@@ -317,9 +317,11 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 func renderD2(ctx context.Context, source string, opts *RenderOptions, c4Mode bool) ([]byte, error) {
 	renderOpts := render.DefaultOptions()
 
-	// Apply C4 mode defaults (Terminal theme)
+	// Apply C4 mode defaults (Terminal theme + inject C4 classes)
 	if c4Mode {
 		renderOpts.ThemeID = 8
+		// Prepend C4 class definitions to the source
+		source = render.ApplyC4Theme(source)
 	}
 
 	// Allow explicit options to override C4 defaults

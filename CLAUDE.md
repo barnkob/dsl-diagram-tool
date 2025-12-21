@@ -93,11 +93,39 @@ See `docs/DESIGN-vertices.md` for detailed design.
 
 Use the `--c4` flag for C4 architecture diagrams:
 ```bash
-./bin/diagtool serve examples/c4/01-system-context.d2 --c4
-./bin/diagtool render examples/c4/01-system-context.d2 --c4 -o output.svg
+./bin/diagtool serve examples/c4/04-with-theme.d2 --c4
+./bin/diagtool render examples/c4/04-with-theme.d2 --c4 -o output.svg
 ```
 
-The `--c4` flag applies the Terminal theme (ID 8) for clean C4 styling. D2's native `c4-person` shape renders correctly with separate head and body.
+The `--c4` flag:
+- Applies the Terminal theme (ID 8) for a clean professional look
+- Injects C4 style classes with Structurizr's conventional color scheme
+
+**C4 Theme Classes** (available when using `--c4`):
+
+| Class | Purpose | Color |
+|-------|---------|-------|
+| `c4-person` | Person actor | Dark blue (#08427b) |
+| `c4-system` | Software System | Medium blue (#1168bd) |
+| `c4-container` | Container | Light blue (#438dd5) |
+| `c4-component` | Component | Lightest blue (#85bbf0) |
+| `c4-external` | External System | Gray (#999999) |
+| `c4-external-person` | External Person | Gray (#999999) |
+
+**Usage in D2:**
+```d2
+customer: Customer {
+  class: c4-person
+}
+banking: Internet Banking System {
+  class: c4-system
+}
+mainframe: Legacy System {
+  class: c4-external
+}
+```
+
+D2's native `c4-person` shape renders correctly with separate head and body.
 
 ## Dependencies
 

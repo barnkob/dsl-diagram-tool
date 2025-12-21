@@ -191,6 +191,12 @@ func doRender(cfg *renderConfig) error {
 
 	ctx := context.Background()
 
+	// Apply C4 theme classes if in C4 mode
+	source := string(content)
+	if c4Mode {
+		source = render.ApplyC4Theme(source)
+	}
+
 	// Load metadata if available
 	metadata, err := loadMetadata(cfg.inputFile)
 	if err != nil {
@@ -200,7 +206,7 @@ func doRender(cfg *renderConfig) error {
 	}
 
 	// First, render D2 source to SVG (base rendering)
-	d2Svg, err := render.RenderFromSource(ctx, string(content), cfg.opts)
+	d2Svg, err := render.RenderFromSource(ctx, source, cfg.opts)
 	if err != nil {
 		return fmt.Errorf("rendering failed: %w", err)
 	}

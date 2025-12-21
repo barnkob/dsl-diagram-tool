@@ -1,0 +1,51 @@
+# C4 System Context Diagram (using C4 theme classes)
+#
+# This example uses the built-in C4 theme classes provided by --c4 mode.
+# No manual color definitions needed!
+#
+# Usage:
+#   diagtool render examples/c4/04-with-theme.d2 --c4 -o context.svg
+#   diagtool serve examples/c4/04-with-theme.d2 --c4
+#
+# Available classes (when using --c4 flag):
+#   c4-person          - Person actor (dark blue)
+#   c4-system          - Software System (medium blue)
+#   c4-container       - Container (light blue)
+#   c4-component       - Component (lightest blue)
+#   c4-external        - External System (gray)
+#   c4-external-person - External Person (gray)
+
+# Actors
+customer: Customer {
+  class: c4-person
+}
+
+admin: Admin User {
+  class: c4-person
+}
+
+# Primary System
+banking: Internet Banking System {
+  class: c4-system
+}
+
+# External Systems
+email: E-mail System {
+  class: c4-external
+}
+
+mainframe: Mainframe Banking System {
+  class: c4-external
+}
+
+support: External Support Team {
+  class: c4-external-person
+}
+
+# Relationships
+customer -> banking: Views account balances\nand makes payments using
+admin -> banking: Manages users and\nconfigures system
+banking -> email: Sends e-mails using
+banking -> mainframe: Gets account information\nand makes payments using
+email -> customer: Sends e-mails to
+support -> mainframe: Provides support for
