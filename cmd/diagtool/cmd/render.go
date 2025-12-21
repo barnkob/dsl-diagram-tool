@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -13,7 +14,6 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/cobra"
 
-	"github.com/mark/dsl-diagram-tool/pkg/parser"
 	"github.com/mark/dsl-diagram-tool/pkg/render"
 )
 
@@ -150,6 +150,26 @@ func resolveRenderConfig(inputFile string) (*renderConfig, error) {
 	}, nil
 }
 
+// loadMetadata loads the .d2meta file if it exists alongside the D2 file.
+func loadMetadata(d2FilePath string) (*render.Metadata, error) {
+	metaPath := strings.TrimSuffix(d2FilePath, filepath.Ext(d2FilePath)) + ".d2meta"
+
+	data, err := os.ReadFile(metaPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil // No metadata file, not an error
+		}
+		return nil, fmt.Errorf("failed to read metadata file: %w", err)
+	}
+
+	var meta render.Metadata
+	if err := json.Unmarshal(data, &meta); err != nil {
+		return nil, fmt.Errorf("failed to parse metadata file: %w", err)
+	}
+
+	return &meta, nil
+}
+
 // doRender performs a single render operation
 func doRender(cfg *renderConfig) error {
 	// Read input file
@@ -159,53 +179,47 @@ func doRender(cfg *renderConfig) error {
 	}
 
 	ctx := context.Background()
+
+	// Load metadata if available
+	metadata, err := loadMetadata(cfg.inputFile)
+	if err != nil {
+		// Log warning but continue without metadata
+		fmt.Printf("Warning: %v\n", err)
+		metadata = nil
+	}
+
+	// First, render D2 source to SVG (base rendering)
+	d2Svg, err := render.RenderFromSource(ctx, string(content), cfg.opts)
+	if err != nil {
+		return fmt.Errorf("rendering failed: %w", err)
+	}
+
+	// Check if we have metadata to apply
+	hasMetadata := metadata != nil && (len(metadata.Positions) > 0 || len(metadata.Vertices) > 0)
+
 	var output []byte
 
-	switch cfg.format {
-	case "svg":
-		output, err = render.RenderFromSource(ctx, string(content), cfg.opts)
+	if hasMetadata {
+		// Use JointJS-based rendering with metadata
+		output, err = render.RenderWithMetadata(ctx, d2Svg, metadata, render.Format(cfg.format), cfg.opts.PixelDensity)
 		if err != nil {
-			return fmt.Errorf("rendering failed: %w", err)
+			return fmt.Errorf("rendering with metadata failed: %w", err)
 		}
-	case "png":
-		// Parse D2 to IR
-		p := parser.NewD2Parser()
-		diagram, err := p.Parse(string(content))
-		if err != nil {
-			return fmt.Errorf("parsing failed: %w", err)
-		}
-
-		// Create PNG renderer
-		pngRenderer, err := render.NewPNGRendererWithOptions(cfg.opts)
-		if err != nil {
-			return fmt.Errorf("failed to initialize PNG renderer: %w", err)
-		}
-		defer pngRenderer.Close()
-
-		// Render to PNG
-		output, err = pngRenderer.RenderToBytes(ctx, diagram)
-		if err != nil {
-			return fmt.Errorf("PNG rendering failed: %w", err)
-		}
-	case "pdf":
-		// Parse D2 to IR
-		p := parser.NewD2Parser()
-		diagram, err := p.Parse(string(content))
-		if err != nil {
-			return fmt.Errorf("parsing failed: %w", err)
-		}
-
-		// Create PDF renderer
-		pdfRenderer, err := render.NewPDFRendererWithOptions(cfg.opts)
-		if err != nil {
-			return fmt.Errorf("failed to initialize PDF renderer: %w", err)
-		}
-		defer pdfRenderer.Close()
-
-		// Render to PDF
-		output, err = pdfRenderer.RenderToBytes(ctx, diagram)
-		if err != nil {
-			return fmt.Errorf("PDF rendering failed: %w", err)
+	} else {
+		// No metadata, use standard rendering
+		switch cfg.format {
+		case "svg":
+			output = d2Svg
+		case "png":
+			output, err = render.SVGToPNG(ctx, d2Svg, cfg.opts.PixelDensity)
+			if err != nil {
+				return fmt.Errorf("PNG rendering failed: %w", err)
+			}
+		case "pdf":
+			output, err = render.SVGToPDF(ctx, d2Svg)
+			if err != nil {
+				return fmt.Errorf("PDF rendering failed: %w", err)
+			}
 		}
 	}
 

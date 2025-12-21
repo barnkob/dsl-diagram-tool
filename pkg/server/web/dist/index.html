@@ -228,7 +228,7 @@
             stroke-width: 1;
         }
         .joint-element text {
-            fill: #d4d4d4;
+            fill: #000000;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
         .joint-link .connection {
@@ -344,7 +344,7 @@
             grid: '#e0e0e0',
             nodeFill: '#ffffff',
             nodeStroke: '#333333',
-            nodeText: '#1e1e1e',
+            nodeText: '#000000',
             linkStroke: '#666666'
         };
 
@@ -575,6 +575,217 @@
             updateDebug('JointJS initialized');
         }
 
+        // Detect shape type from D2 SVG element
+        function detectShapeType(shapeElement) {
+            // Check for ellipse (circle or oval)
+            const ellipse = shapeElement.querySelector('ellipse');
+            if (ellipse) {
+                const rx = parseFloat(ellipse.getAttribute('rx'));
+                const ry = parseFloat(ellipse.getAttribute('ry'));
+                return Math.abs(rx - ry) < 1 ? 'circle' : 'oval';
+            }
+
+            // Check for rect
+            if (shapeElement.querySelector('rect')) {
+                return 'rectangle';
+            }
+
+            // Check paths
+            const paths = shapeElement.querySelectorAll('path');
+            if (paths.length === 2) {
+                return 'cylinder';
+            }
+
+            if (paths.length === 1) {
+                const d = paths[0].getAttribute('d') || '';
+                const lineCount = (d.match(/[L]/gi) || []).length;
+
+                if (lineCount === 6) return 'hexagon';
+                if (lineCount === 4) return 'diamond';
+
+                // Complex shapes - check for curves
+                const curveCount = (d.match(/[C]/gi) || []).length;
+                if (curveCount > 10) return 'cloud';
+                if (curveCount > 3) return 'person';
+            }
+
+            return 'rectangle';
+        }
+
+        // Shape Registry - extensible factory pattern for creating JointJS shapes
+        const ShapeRegistry = {
+            shapes: {},
+
+            register(type, factory) {
+                this.shapes[type] = factory;
+            },
+
+            create(type, opts) {
+                const factory = this.shapes[type] || this.shapes['rectangle'];
+                return factory(opts);
+            }
+        };
+
+        // Register basic shapes
+        ShapeRegistry.register('rectangle', (opts) => {
+            return new joint.shapes.standard.Rectangle({
+                position: { x: opts.x, y: opts.y },
+                size: { width: opts.width, height: opts.height },
+                attrs: {
+                    body: { fill: opts.fill, stroke: opts.stroke, strokeWidth: 1, rx: 4, ry: 4 },
+                    label: { text: opts.label, fill: opts.textColor, fontSize: 14 }
+                }
+            });
+        });
+
+        ShapeRegistry.register('circle', (opts) => {
+            return new joint.shapes.standard.Circle({
+                position: { x: opts.x, y: opts.y },
+                size: { width: opts.width, height: opts.height },
+                attrs: {
+                    body: { fill: opts.fill, stroke: opts.stroke, strokeWidth: 1 },
+                    label: { text: opts.label, fill: opts.textColor, fontSize: 14 }
+                }
+            });
+        });
+
+        ShapeRegistry.register('oval', (opts) => {
+            return new joint.shapes.standard.Ellipse({
+                position: { x: opts.x, y: opts.y },
+                size: { width: opts.width, height: opts.height },
+                attrs: {
+                    body: { fill: opts.fill, stroke: opts.stroke, strokeWidth: 1 },
+                    label: { text: opts.label, fill: opts.textColor, fontSize: 14 }
+                }
+            });
+        });
+
+        ShapeRegistry.register('diamond', (opts) => {
+            return new joint.shapes.standard.Polygon({
+                position: { x: opts.x, y: opts.y },
+                size: { width: opts.width, height: opts.height },
+                attrs: {
+                    body: {
+                        fill: opts.fill,
+                        stroke: opts.stroke,
+                        strokeWidth: 1,
+                        refPoints: '0.5,0 1,0.5 0.5,1 0,0.5'
+                    },
+                    label: { text: opts.label, fill: opts.textColor, fontSize: 14 }
+                }
+            });
+        });
+
+        ShapeRegistry.register('hexagon', (opts) => {
+            return new joint.shapes.standard.Polygon({
+                position: { x: opts.x, y: opts.y },
+                size: { width: opts.width, height: opts.height },
+                attrs: {
+                    body: {
+                        fill: opts.fill,
+                        stroke: opts.stroke,
+                        strokeWidth: 1,
+                        refPoints: '0.25,0 0.75,0 1,0.5 0.75,1 0.25,1 0,0.5'
+                    },
+                    label: { text: opts.label, fill: opts.textColor, fontSize: 14 }
+                }
+            });
+        });
+
+        ShapeRegistry.register('cylinder', (opts) => {
+            return new joint.shapes.standard.Cylinder({
+                position: { x: opts.x, y: opts.y },
+                size: { width: opts.width, height: opts.height },
+                attrs: {
+                    body: { fill: opts.fill, stroke: opts.stroke, strokeWidth: 1 },
+                    top: { fill: opts.fill, stroke: opts.stroke, strokeWidth: 1 },
+                    label: { text: opts.label, fill: opts.textColor, fontSize: 14, x: opts.width / 2, y: opts.height / 2 + 10, textAnchor: 'middle' }
+                }
+            });
+        });
+
+        // Person shape - C4 style: round head + rectangular body
+        ShapeRegistry.register('person', (opts) => {
+            const w = opts.width;
+            const h = opts.height;
+            // C4 person: circular head on top of rounded rectangle body
+            // Head is 25% of height, body is 60% of width centered
+            const headRadius = Math.min(w * 0.30, h * 0.125);
+            const headCX = w / 2;
+            const headCY = headRadius;
+            const bodyTop = headRadius * 2 - 2; // Overlap slightly with head for connected look
+            const bodyLeft = w * 0.20;
+            const bodyRight = w * 0.80;
+            const bodyBottom = h;
+            const cornerRadius = 6;
+
+            // Calculate body center for label positioning (as fraction of total height)
+            const bodyCenterY = (bodyTop + bodyBottom) / 2;
+            const labelRefY = bodyCenterY / h;
+
+            // Head circle + body rounded rectangle
+            const d = `
+                M ${headCX + headRadius} ${headCY}
+                A ${headRadius} ${headRadius} 0 1 0 ${headCX - headRadius} ${headCY}
+                A ${headRadius} ${headRadius} 0 1 0 ${headCX + headRadius} ${headCY}
+                M ${bodyLeft + cornerRadius} ${bodyTop}
+                L ${bodyRight - cornerRadius} ${bodyTop}
+                Q ${bodyRight} ${bodyTop} ${bodyRight} ${bodyTop + cornerRadius}
+                L ${bodyRight} ${bodyBottom - cornerRadius}
+                Q ${bodyRight} ${bodyBottom} ${bodyRight - cornerRadius} ${bodyBottom}
+                L ${bodyLeft + cornerRadius} ${bodyBottom}
+                Q ${bodyLeft} ${bodyBottom} ${bodyLeft} ${bodyBottom - cornerRadius}
+                L ${bodyLeft} ${bodyTop + cornerRadius}
+                Q ${bodyLeft} ${bodyTop} ${bodyLeft + cornerRadius} ${bodyTop}
+                Z
+            `.replace(/\s+/g, ' ').trim();
+
+            return new joint.shapes.standard.Path({
+                position: { x: opts.x, y: opts.y },
+                size: { width: w, height: h },
+                attrs: {
+                    body: {
+                        fill: opts.fill,
+                        stroke: opts.stroke,
+                        strokeWidth: 1,
+                        d: d
+                    },
+                    label: { text: opts.label, fill: opts.textColor, fontSize: 14, refX: 0.5, refY: labelRefY, textAnchor: 'middle', textVerticalAnchor: 'middle' }
+                }
+            });
+        });
+
+        // Cloud shape - bumpy cloud outline
+        ShapeRegistry.register('cloud', (opts) => {
+            const w = opts.width;
+            const h = opts.height;
+            // Cloud made with overlapping circles approximated as bezier curves
+            const d = `
+                M ${w * 0.2} ${h * 0.75}
+                C ${w * 0.05} ${h * 0.75} 0 ${h * 0.6} 0 ${h * 0.5}
+                C 0 ${h * 0.35} ${w * 0.1} ${h * 0.25} ${w * 0.2} ${h * 0.25}
+                C ${w * 0.2} ${h * 0.1} ${w * 0.35} 0 ${w * 0.5} 0
+                C ${w * 0.65} 0 ${w * 0.75} ${h * 0.1} ${w * 0.8} ${h * 0.2}
+                C ${w * 0.9} ${h * 0.2} ${w} ${h * 0.35} ${w} ${h * 0.5}
+                C ${w} ${h * 0.65} ${w * 0.9} ${h * 0.75} ${w * 0.8} ${h * 0.75}
+                Z
+            `.replace(/\s+/g, ' ').trim();
+
+            return new joint.shapes.standard.Path({
+                position: { x: opts.x, y: opts.y },
+                size: { width: w, height: h },
+                attrs: {
+                    body: {
+                        fill: opts.fill,
+                        stroke: opts.stroke,
+                        strokeWidth: 1,
+                        d: d
+                    },
+                    label: { text: opts.label, fill: opts.textColor, fontSize: 14 }
+                }
+            });
+        });
+
         // Parse D2 SVG and extract node information
         function parseD2Svg(svgString) {
             // Temporarily make visible to compute bounding boxes
@@ -616,7 +827,8 @@
                                 y: bbox.y,
                                 width: bbox.width,
                                 height: bbox.height,
-                                label: extractLabel(g)
+                                label: extractLabel(g),
+                                shapeType: detectShapeType(shape)
                             });
                             console.log('Found node:', decoded, bbox);
                         }
@@ -706,31 +918,24 @@
                 const x = node.x + offset.dx;
                 const y = node.y + offset.dy;
 
-                const rect = new joint.shapes.standard.Rectangle({
-                    position: { x, y },
-                    size: { width: node.width, height: node.height },
-                    attrs: {
-                        body: {
-                            fill: canvasColors.nodeFill,
-                            stroke: canvasColors.nodeStroke,
-                            strokeWidth: 1,
-                            rx: 4,
-                            ry: 4
-                        },
-                        label: {
-                            text: node.label,
-                            fill: canvasColors.nodeText,
-                            fontSize: 14
-                        }
-                    }
+                const element = ShapeRegistry.create(node.shapeType || 'rectangle', {
+                    x: x,
+                    y: y,
+                    width: node.width,
+                    height: node.height,
+                    label: node.label,
+                    fill: canvasColors.nodeFill,
+                    stroke: canvasColors.nodeStroke,
+                    textColor: canvasColors.nodeText
                 });
 
                 // Store metadata for position tracking
-                rect.set('nodeId', node.id);
-                rect.set('originalPosition', { x: node.x, y: node.y });
+                element.set('nodeId', node.id);
+                element.set('shapeType', node.shapeType);
+                element.set('originalPosition', { x: node.x, y: node.y });
 
-                jointElements[node.id] = rect;
-                graph.addCell(rect);
+                jointElements[node.id] = element;
+                graph.addCell(element);
             }
 
             // Create links
@@ -920,6 +1125,7 @@
                     case 'positions-cleared':
                         nodePositions = {};
                         edgeVertices = {};
+                        isFirstRender = true;  // Force full re-render
                         render();
                         showToast('Layout reset', 'success');
                         break;
@@ -932,13 +1138,175 @@
             };
         }
 
-        function handleRendered(svgString) {
-            // Parse D2 SVG and create JointJS elements
-            const { nodes, edges } = parseD2Svg(svgString);
-            createJointElements(nodes, edges);
+        // Track if this is the first render
+        let isFirstRender = true;
 
-            // Center the view
-            paper.translate(20, 20);
+        function handleRendered(svgString) {
+            // Parse D2 SVG
+            const { nodes, edges } = parseD2Svg(svgString);
+
+            if (isFirstRender) {
+                // First render - create all elements
+                createJointElements(nodes, edges);
+                paper.translate(20, 20);
+                isFirstRender = false;
+            } else {
+                // Subsequent renders - update differentially to preserve positions
+                updateDiagram(nodes, edges);
+            }
+        }
+
+        // Update diagram differentially - preserves node positions
+        function updateDiagram(newNodes, newEdges) {
+            const existingNodeIds = new Set(Object.keys(jointElements));
+            const newNodeIds = new Set(newNodes.map(n => n.id));
+            const existingEdgeIds = new Set(Object.keys(jointLinks));
+            const newEdgeIds = new Set(newEdges.map(e => e.id));
+
+            graph.startBatch('update');
+
+            // Remove deleted nodes
+            for (const id of existingNodeIds) {
+                if (!newNodeIds.has(id)) {
+                    jointElements[id].remove();
+                    delete jointElements[id];
+                    delete nodePositions[id];
+                }
+            }
+
+            // Remove deleted edges
+            for (const id of existingEdgeIds) {
+                if (!newEdgeIds.has(id)) {
+                    jointLinks[id].remove();
+                    delete jointLinks[id];
+                    delete edgeVertices[id];
+                }
+            }
+
+            // Process nodes
+            for (const node of newNodes) {
+                if (jointElements[node.id]) {
+                    // Update existing node
+                    const el = jointElements[node.id];
+                    const currentShapeType = el.get('shapeType');
+
+                    // Update original position (D2 layout may have changed)
+                    el.set('originalPosition', { x: node.x, y: node.y });
+
+                    // If shape type changed, recreate element preserving position
+                    if (currentShapeType !== node.shapeType) {
+                        const currentPos = el.position();
+                        const offset = nodePositions[node.id] || { dx: 0, dy: 0 };
+                        el.remove();
+
+                        const newEl = ShapeRegistry.create(node.shapeType || 'rectangle', {
+                            x: currentPos.x,
+                            y: currentPos.y,
+                            width: node.width,
+                            height: node.height,
+                            label: node.label,
+                            fill: canvasColors.nodeFill,
+                            stroke: canvasColors.nodeStroke,
+                            textColor: canvasColors.nodeText
+                        });
+                        newEl.set('nodeId', node.id);
+                        newEl.set('shapeType', node.shapeType);
+                        newEl.set('originalPosition', { x: node.x, y: node.y });
+                        jointElements[node.id] = newEl;
+                        graph.addCell(newEl);
+                    } else {
+                        // Same shape type - just update size and label
+                        el.resize(node.width, node.height);
+                        el.attr('label/text', node.label);
+
+                        // Re-apply position offset (D2 position may have changed)
+                        const offset = nodePositions[node.id] || { dx: 0, dy: 0 };
+                        el.position(node.x + offset.dx, node.y + offset.dy, { skipUndo: true });
+                    }
+                } else {
+                    // Add new node
+                    const offset = nodePositions[node.id] || { dx: 0, dy: 0 };
+                    const el = ShapeRegistry.create(node.shapeType || 'rectangle', {
+                        x: node.x + offset.dx,
+                        y: node.y + offset.dy,
+                        width: node.width,
+                        height: node.height,
+                        label: node.label,
+                        fill: canvasColors.nodeFill,
+                        stroke: canvasColors.nodeStroke,
+                        textColor: canvasColors.nodeText
+                    });
+                    el.set('nodeId', node.id);
+                    el.set('shapeType', node.shapeType);
+                    el.set('originalPosition', { x: node.x, y: node.y });
+                    jointElements[node.id] = el;
+                    graph.addCell(el);
+                }
+            }
+
+            // Process edges
+            for (const edge of newEdges) {
+                const sourceEl = jointElements[edge.source];
+                const targetEl = jointElements[edge.target];
+
+                if (!sourceEl || !targetEl) continue;
+
+                if (jointLinks[edge.id]) {
+                    // Update existing link - just ensure endpoints are correct
+                    const link = jointLinks[edge.id];
+                    link.source({ id: sourceEl.id });
+                    link.target({ id: targetEl.id });
+                } else {
+                    // Add new link
+                    const link = new joint.shapes.standard.Link({
+                        source: { id: sourceEl.id },
+                        target: { id: targetEl.id },
+                        attrs: {
+                            line: {
+                                stroke: canvasColors.linkStroke,
+                                strokeWidth: 2,
+                                targetMarker: {
+                                    type: 'path',
+                                    d: 'M 10 -5 0 0 10 5 z',
+                                    fill: canvasColors.linkStroke
+                                }
+                            }
+                        }
+                    });
+
+                    // Handle arrow direction
+                    if (edge.direction === '<->') {
+                        link.attr('line/sourceMarker', {
+                            type: 'path',
+                            d: 'M 10 -5 0 0 10 5 z',
+                            fill: canvasColors.linkStroke
+                        });
+                    } else if (edge.direction === '<-') {
+                        link.attr('line/targetMarker', null);
+                        link.attr('line/sourceMarker', {
+                            type: 'path',
+                            d: 'M 10 -5 0 0 10 5 z',
+                            fill: canvasColors.linkStroke
+                        });
+                    } else if (edge.direction === '--') {
+                        link.attr('line/targetMarker', null);
+                    }
+
+                    link.set('edgeId', edge.id);
+                    jointLinks[edge.id] = link;
+
+                    // Apply stored vertices if any
+                    const storedVertices = edgeVertices[edge.id];
+                    if (storedVertices && storedVertices.length > 0) {
+                        link.vertices(storedVertices);
+                    }
+
+                    graph.addCell(link);
+                }
+            }
+
+            graph.stopBatch('update');
+            updateDebug(`Updated: ${newNodes.length} nodes, ${newEdges.length} edges`);
         }
 
         function applyPositions() {

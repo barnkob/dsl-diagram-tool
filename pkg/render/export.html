@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>DiagTool Export</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #ffffff; }
+        #jointjs-paper { width: 100%; height: 100vh; }
+        #d2-svg-hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div id="jointjs-paper"></div>
+    <div id="d2-svg-hidden"></div>
+
+    <!-- JointJS dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/backbone@1.4.1/backbone-min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@joint/core@4.0.4/dist/joint.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@joint/core@4.0.4/dist/joint.css">
+
+    <script>
+        // Canvas colors (light theme)
+        const canvasColors = {
+            background: '#ffffff',
+            grid: '#e0e0e0',
+            nodeFill: '#ffffff',
+            nodeStroke: '#333333',
+            nodeText: '#000000',
+            linkStroke: '#666666'
+        };
+
+        let graph, paper;
+        let jointElements = {};
+        let jointLinks = {};
+
+        // Initialize JointJS
+        function initJointJS() {
+            graph = new joint.dia.Graph({}, { cellNamespace: joint.shapes });
+
+            paper = new joint.dia.Paper({
+                el: document.getElementById('jointjs-paper'),
+                model: graph,
+                width: 2000,
+                height: 2000,
+                gridSize: 10,
+                drawGrid: false,
+                background: { color: canvasColors.background },
+                cellViewNamespace: joint.shapes,
+                interactive: false
+            });
+        }
+
+        // Base64 decode helper
+        function decodeBase64(str) {
+            try {
+                return atob(str);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        // Decode HTML entities
+        function decodeHtmlEntities(str) {
+            const textarea = document.createElement('textarea');
+            textarea.innerHTML = str;
+            return textarea.value;
+        }
+
+        // Parse edge ID to extract source and target
+        function parseEdgeId(edgeId) {
+            const decoded = decodeHtmlEntities(edgeId);
+            const match = decoded.match(/^(.*?)\((.+?)\s*(->|<-|<->|--)\s*(.+?)\)\[(\d+)\]$/);
+            if (!match) return null;
+
+            let prefix = match[1];
+            let source = match[2];
+            let target = match[4];
+            const direction = match[3];
+
+            if (prefix.endsWith('.')) {
+                prefix = prefix.slice(0, -1);
+            }
+            if (prefix) {
+                source = prefix + '.' + source;
+                target = prefix + '.' + target;
+            }
+
+            return { source, target, direction };
+        }
+
+        // Extract label text from a D2 node group
+        function extractLabel(group) {
+            const textEl = group.querySelector('text');
+            if (textEl) {
+                return textEl.textContent || '';
+            }
+            return '';
+        }
+
+        // Detect shape type from D2 SVG element
+        function detectShapeType(shapeElement) {
+            // Check for ellipse (circle or oval)
+            const ellipse = shapeElement.querySelector('ellipse');
+            if (ellipse) {
+                const rx = parseFloat(ellipse.getAttribute('rx'));
+                const ry = parseFloat(ellipse.getAttribute('ry'));
+                return Math.abs(rx - ry) < 1 ? 'circle' : 'oval';
+            }
+
+            // Check for rect
+            if (shapeElement.querySelector('rect')) {
+                return 'rectangle';
+            }
+
+            // Check paths
+            const paths = shapeElement.querySelectorAll('path');
+            if (paths.length === 2) {
+                return 'cylinder';
+            }
+
+            if (paths.length === 1) {
+                const d = paths[0].getAttribute('d') || '';
+                const lineCount = (d.match(/[L]/gi) || []).length;
+
+                if (lineCount === 6) return 'hexagon';
+                if (lineCount === 4) return 'diamond';
+
+                // Complex shapes - check for curves
+                const curveCount = (d.match(/[C]/gi) || []).length;
+                if (curveCount > 10) return 'cloud';
+                if (curveCount > 3) return 'person';
+            }
+
+            return 'rectangle';
+        }
+
+        // Shape Registry - extensible factory pattern for creating JointJS shapes
+        const ShapeRegistry = {
+            shapes: {},
+
+            register(type, factory) {
+                this.shapes[type] = factory;
+            },
+
+            create(type, opts) {
+                const factory = this.shapes[type] || this.shapes['rectangle'];
+                return factory(opts);
+            }
+        };
+
+        // Register basic shapes
+        ShapeRegistry.register('rectangle', (opts) => {
+            return new joint.shapes.standard.Rectangle({
+                position: { x: opts.x, y: opts.y },
+                size: { width: opts.width, height: opts.height },
+                attrs: {
+                    body: { fill: opts.fill, stroke: opts.stroke, strokeWidth: 1, rx: 4, ry: 4 },
+                    label: { text: opts.label, fill: opts.textColor, fontSize: 14 }
+                }
+            });
+        });
+
+        ShapeRegistry.register('circle', (opts) => {
+            return new joint.shapes.standard.Circle({
+                position: { x: opts.x, y: opts.y },
+                size: { width: opts.width, height: opts.height },
+                attrs: {
+                    body: { fill: opts.fill, stroke: opts.stroke, strokeWidth: 1 },
+                    label: { text: opts.label, fill: opts.textColor, fontSize: 14 }
+                }
+            });
+        });
+
+        ShapeRegistry.register('oval', (opts) => {
+            return new joint.shapes.standard.Ellipse({
+                position: { x: opts.x, y: opts.y },
+                size: { width: opts.width, height: opts.height },
+                attrs: {
+                    body: { fill: opts.fill, stroke: opts.stroke, strokeWidth: 1 },
+                    label: { text: opts.label, fill: opts.textColor, fontSize: 14 }
+                }
+            });
+        });
+
+        ShapeRegistry.register('diamond', (opts) => {
+            return new joint.shapes.standard.Polygon({
+                position: { x: opts.x, y: opts.y },
+                size: { width: opts.width, height: opts.height },
+                attrs: {
+                    body: {
+                        fill: opts.fill,
+                        stroke: opts.stroke,
+                        strokeWidth: 1,
+                        refPoints: '0.5,0 1,0.5 0.5,1 0,0.5'
+                    },
+                    label: { text: opts.label, fill: opts.textColor, fontSize: 14 }
+                }
+            });
+        });
+
+        ShapeRegistry.register('hexagon', (opts) => {
+            return new joint.shapes.standard.Polygon({
+                position: { x: opts.x, y: opts.y },
+                size: { width: opts.width, height: opts.height },
+                attrs: {
+                    body: {
+                        fill: opts.fill,
+                        stroke: opts.stroke,
+                        strokeWidth: 1,
+                        refPoints: '0.25,0 0.75,0 1,0.5 0.75,1 0.25,1 0,0.5'
+                    },
+                    label: { text: opts.label, fill: opts.textColor, fontSize: 14 }
+                }
+            });
+        });
+
+        ShapeRegistry.register('cylinder', (opts) => {
+            return new joint.shapes.standard.Cylinder({
+                position: { x: opts.x, y: opts.y },
+                size: { width: opts.width, height: opts.height },
+                attrs: {
+                    body: { fill: opts.fill, stroke: opts.stroke, strokeWidth: 1 },
+                    top: { fill: opts.fill, stroke: opts.stroke, strokeWidth: 1 },
+                    label: { text: opts.label, fill: opts.textColor, fontSize: 14, x: opts.width / 2, y: opts.height / 2 + 10, textAnchor: 'middle' }
+                }
+            });
+        });
+
+        // Person shape - C4 style: round head + rectangular body
+        ShapeRegistry.register('person', (opts) => {
+            const w = opts.width;
+            const h = opts.height;
+            // C4 person: circular head on top of rounded rectangle body
+            // Head is 25% of height, body is 60% of width centered
+            const headRadius = Math.min(w * 0.30, h * 0.125);
+            const headCX = w / 2;
+            const headCY = headRadius;
+            const bodyTop = headRadius * 2 - 2; // Overlap slightly with head for connected look
+            const bodyLeft = w * 0.20;
+            const bodyRight = w * 0.80;
+            const bodyBottom = h;
+            const cornerRadius = 6;
+
+            // Calculate body center for label positioning (as fraction of total height)
+            const bodyCenterY = (bodyTop + bodyBottom) / 2;
+            const labelRefY = bodyCenterY / h;
+
+            // Head circle + body rounded rectangle
+            const d = `
+                M ${headCX + headRadius} ${headCY}
+                A ${headRadius} ${headRadius} 0 1 0 ${headCX - headRadius} ${headCY}
+                A ${headRadius} ${headRadius} 0 1 0 ${headCX + headRadius} ${headCY}
+                M ${bodyLeft + cornerRadius} ${bodyTop}
+                L ${bodyRight - cornerRadius} ${bodyTop}
+                Q ${bodyRight} ${bodyTop} ${bodyRight} ${bodyTop + cornerRadius}
+                L ${bodyRight} ${bodyBottom - cornerRadius}
+                Q ${bodyRight} ${bodyBottom} ${bodyRight - cornerRadius} ${bodyBottom}
+                L ${bodyLeft + cornerRadius} ${bodyBottom}
+                Q ${bodyLeft} ${bodyBottom} ${bodyLeft} ${bodyBottom - cornerRadius}
+                L ${bodyLeft} ${bodyTop + cornerRadius}
+                Q ${bodyLeft} ${bodyTop} ${bodyLeft + cornerRadius} ${bodyTop}
+                Z
+            `.replace(/\s+/g, ' ').trim();
+
+            return new joint.shapes.standard.Path({
+                position: { x: opts.x, y: opts.y },
+                size: { width: w, height: h },
+                attrs: {
+                    body: {
+                        fill: opts.fill,
+                        stroke: opts.stroke,
+                        strokeWidth: 1,
+                        d: d
+                    },
+                    label: { text: opts.label, fill: opts.textColor, fontSize: 14, refX: 0.5, refY: labelRefY, textAnchor: 'middle', textVerticalAnchor: 'middle' }
+                }
+            });
+        });
+
+        // Cloud shape - bumpy cloud outline
+        ShapeRegistry.register('cloud', (opts) => {
+            const w = opts.width;
+            const h = opts.height;
+            const d = `
+                M ${w * 0.2} ${h * 0.75}
+                C ${w * 0.05} ${h * 0.75} 0 ${h * 0.6} 0 ${h * 0.5}
+                C 0 ${h * 0.35} ${w * 0.1} ${h * 0.25} ${w * 0.2} ${h * 0.25}
+                C ${w * 0.2} ${h * 0.1} ${w * 0.35} 0 ${w * 0.5} 0
+                C ${w * 0.65} 0 ${w * 0.75} ${h * 0.1} ${w * 0.8} ${h * 0.2}
+                C ${w * 0.9} ${h * 0.2} ${w} ${h * 0.35} ${w} ${h * 0.5}
+                C ${w} ${h * 0.65} ${w * 0.9} ${h * 0.75} ${w * 0.8} ${h * 0.75}
+                Z
+            `.replace(/\s+/g, ' ').trim();
+
+            return new joint.shapes.standard.Path({
+                position: { x: opts.x, y: opts.y },
+                size: { width: w, height: h },
+                attrs: {
+                    body: {
+                        fill: opts.fill,
+                        stroke: opts.stroke,
+                        strokeWidth: 1,
+                        d: d
+                    },
+                    label: { text: opts.label, fill: opts.textColor, fontSize: 14 }
+                }
+            });
+        });
+
+        // Parse D2 SVG and extract node/edge information
+        function parseD2Svg(svgString) {
+            const container = document.getElementById('d2-svg-hidden');
+            container.style.display = 'block';
+            container.style.position = 'absolute';
+            container.style.left = '-9999px';
+            container.innerHTML = svgString;
+
+            const svg = container.querySelector('svg');
+            if (!svg) {
+                container.style.display = 'none';
+                return { nodes: [], edges: [] };
+            }
+
+            const nodes = [];
+            const edges = [];
+
+            const groups = svg.querySelectorAll('g');
+            for (const g of groups) {
+                const className = g.getAttribute('class');
+                if (!className) continue;
+
+                const classes = className.split(/\s+/);
+                for (const cls of classes) {
+                    const decoded = decodeBase64(cls);
+                    if (!decoded) continue;
+
+                    const shape = g.querySelector('.shape');
+                    if (shape && !decoded.startsWith('(')) {
+                        const bbox = shape.getBBox();
+                        if (bbox.width > 0 && bbox.height > 0) {
+                            nodes.push({
+                                id: decoded,
+                                x: bbox.x,
+                                y: bbox.y,
+                                width: bbox.width,
+                                height: bbox.height,
+                                label: extractLabel(g),
+                                shapeType: detectShapeType(shape)
+                            });
+                        }
+                        break;
+                    }
+
+                    const path = g.querySelector('path.connection');
+                    if (path && decoded.includes('(') && /\)\[\d+\]$/.test(decoded)) {
+                        const parsed = parseEdgeId(decoded);
+                        if (parsed) {
+                            // Use HTML-decoded ID to match metadata keys
+                            const htmlDecodedId = decodeHtmlEntities(decoded);
+                            edges.push({
+                                id: htmlDecodedId,
+                                source: parsed.source,
+                                target: parsed.target,
+                                direction: parsed.direction
+                            });
+                        }
+                        break;
+                    }
+                }
+            }
+
+            container.style.display = 'none';
+            return { nodes, edges };
+        }
+
+        // Create JointJS elements from parsed D2 data
+        function createJointElements(nodes, edges, positions, vertices) {
+            graph.clear();
+            jointElements = {};
+            jointLinks = {};
+
+            // Create nodes
+            for (const node of nodes) {
+                const offset = (positions && positions[node.id]) || { dx: 0, dy: 0 };
+                const x = node.x + (offset.dx || 0);
+                const y = node.y + (offset.dy || 0);
+
+                const element = ShapeRegistry.create(node.shapeType || 'rectangle', {
+                    x: x,
+                    y: y,
+                    width: node.width,
+                    height: node.height,
+                    label: node.label,
+                    fill: canvasColors.nodeFill,
+                    stroke: canvasColors.nodeStroke,
+                    textColor: canvasColors.nodeText
+                });
+
+                element.set('nodeId', node.id);
+                element.set('shapeType', node.shapeType);
+                jointElements[node.id] = element;
+                graph.addCell(element);
+            }
+
+            // Create links
+            for (const edge of edges) {
+                const sourceEl = jointElements[edge.source];
+                const targetEl = jointElements[edge.target];
+
+                if (!sourceEl || !targetEl) continue;
+
+                const link = new joint.shapes.standard.Link({
+                    source: { id: sourceEl.id },
+                    target: { id: targetEl.id },
+                    attrs: {
+                        line: {
+                            stroke: canvasColors.linkStroke,
+                            strokeWidth: 2,
+                            targetMarker: {
+                                type: 'path',
+                                d: 'M 10 -5 0 0 10 5 z',
+                                fill: canvasColors.linkStroke
+                            }
+                        }
+                    }
+                });
+
+                if (edge.direction === '<->') {
+                    link.attr('line/sourceMarker', {
+                        type: 'path',
+                        d: 'M 10 -5 0 0 10 5 z',
+                        fill: canvasColors.linkStroke
+                    });
+                } else if (edge.direction === '<-') {
+                    link.attr('line/targetMarker', null);
+                    link.attr('line/sourceMarker', {
+                        type: 'path',
+                        d: 'M 10 -5 0 0 10 5 z',
+                        fill: canvasColors.linkStroke
+                    });
+                } else if (edge.direction === '--') {
+                    link.attr('line/targetMarker', null);
+                }
+
+                link.set('edgeId', edge.id);
+                jointLinks[edge.id] = link;
+
+                // Apply stored vertices
+                const storedVertices = vertices && vertices[edge.id];
+                if (storedVertices && storedVertices.length > 0) {
+                    link.vertices(storedVertices);
+                }
+
+                graph.addCell(link);
+            }
+        }
+
+        // Serialize JointJS paper to SVG string
+        function serializeSvg() {
+            const svgEl = paper.svg;
+            const clone = svgEl.cloneNode(true);
+
+            clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+            clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+
+            const bbox = paper.getContentBBox();
+            const padding = 20;
+            const width = bbox.width + padding * 2;
+            const height = bbox.height + padding * 2;
+
+            clone.setAttribute('width', width);
+            clone.setAttribute('height', height);
+            clone.setAttribute('viewBox', `${bbox.x - padding} ${bbox.y - padding} ${width} ${height}`);
+
+            // Inline styles
+            const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+            style.textContent = `
+                .joint-element .body { fill: ${canvasColors.nodeFill}; stroke: ${canvasColors.nodeStroke}; stroke-width: 1; }
+                .joint-element text { fill: ${canvasColors.nodeText}; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; }
+                .joint-link .connection { stroke: ${canvasColors.linkStroke}; stroke-width: 2; fill: none; }
+                .joint-link .connection-wrap { fill: none; stroke: transparent; stroke-width: 20; }
+                .joint-link .marker-target, .joint-link .marker-source { fill: ${canvasColors.linkStroke}; }
+                .joint-link .marker-vertex { display: none; }
+                .joint-link .marker-arrowhead { display: none; }
+                .joint-link .link-tools { display: none; }
+                .joint-highlight-stroke { display: none; }
+            `;
+            clone.insertBefore(style, clone.firstChild);
+
+            // Add white background
+            const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            bg.setAttribute('x', bbox.x - padding);
+            bg.setAttribute('y', bbox.y - padding);
+            bg.setAttribute('width', width);
+            bg.setAttribute('height', height);
+            bg.setAttribute('fill', canvasColors.background);
+            clone.insertBefore(bg, clone.firstChild);
+
+            return new XMLSerializer().serializeToString(clone);
+        }
+
+        // Main render function - called from Go via chromedp
+        // Returns: { svg: string, width: number, height: number }
+        function renderDiagram(d2Svg, metadata) {
+            try {
+                initJointJS();
+
+                const positions = (metadata && metadata.positions) || {};
+                const vertices = (metadata && metadata.vertices) || {};
+
+                const { nodes, edges } = parseD2Svg(d2Svg);
+                createJointElements(nodes, edges, positions, vertices);
+
+                const bbox = paper.getContentBBox();
+                const svgString = serializeSvg();
+
+                return {
+                    success: true,
+                    svg: svgString,
+                    width: bbox.width + 40,
+                    height: bbox.height + 40
+                };
+            } catch (err) {
+                return {
+                    success: false,
+                    error: err.message
+                };
+            }
+        }
+
+        // Signal that the page is ready
+        window.exportReady = true;
+    </script>
+</body>
+</html>
