@@ -905,10 +905,14 @@
                                 height: bbox.height,
                                 label: extractLabel(g),
                                 shapeType: shapeType,
-                                pathData: pathData,           // Raw paths from D2
-                                normalizedPath: normalizedPath // Normalized to 0-1 coordinates
+                                pathData: pathData,
+                                normalizedPath: normalizedPath,
+                                // Colors from D2 source
+                                fill: extractFillColor(shape),
+                                stroke: extractStrokeColor(shape),
+                                textColor: extractTextColor(g)
                             });
-                            console.log('Found node:', decoded, shapeType, 'paths:', pathData?.length || 0);
+                            console.log('Found node:', decoded, shapeType, 'fill:', extractFillColor(shape));
                         }
                         break;
                     }
@@ -943,6 +947,24 @@
                 return textEl.textContent || '';
             }
             return '';
+        }
+
+        // Extract fill color from shape element
+        function extractFillColor(shapeElement) {
+            const shape = shapeElement.querySelector('rect, ellipse, path');
+            return shape ? shape.getAttribute('fill') : null;
+        }
+
+        // Extract stroke color from shape element
+        function extractStrokeColor(shapeElement) {
+            const shape = shapeElement.querySelector('rect, ellipse, path');
+            return shape ? shape.getAttribute('stroke') : null;
+        }
+
+        // Extract text/font color from node group
+        function extractTextColor(group) {
+            const text = group.querySelector('text');
+            return text ? text.getAttribute('fill') : null;
         }
 
         // Extract path data from a shape element
@@ -1181,10 +1203,10 @@
                     width: node.width,
                     height: node.height,
                     label: node.label,
-                    fill: canvasColors.nodeFill,
-                    stroke: canvasColors.nodeStroke,
-                    textColor: canvasColors.nodeText,
-                    normalizedPath: node.normalizedPath  // Path extracted from D2 SVG
+                    fill: node.fill || canvasColors.nodeFill,
+                    stroke: node.fill || node.stroke || canvasColors.nodeStroke,
+                    textColor: node.textColor || canvasColors.nodeText,
+                    normalizedPath: node.normalizedPath
                 });
 
                 // Store metadata for position tracking
@@ -1463,9 +1485,9 @@
                             width: node.width,
                             height: node.height,
                             label: node.label,
-                            fill: canvasColors.nodeFill,
-                            stroke: canvasColors.nodeStroke,
-                            textColor: canvasColors.nodeText,
+                            fill: node.fill || canvasColors.nodeFill,
+                            stroke: node.fill || node.stroke || canvasColors.nodeStroke,
+                            textColor: node.textColor || canvasColors.nodeText,
                             normalizedPath: node.normalizedPath
                         });
                         newEl.set('nodeId', node.id);
@@ -1491,9 +1513,9 @@
                         width: node.width,
                         height: node.height,
                         label: node.label,
-                        fill: canvasColors.nodeFill,
-                        stroke: canvasColors.nodeStroke,
-                        textColor: canvasColors.nodeText,
+                        fill: node.fill || canvasColors.nodeFill,
+                        stroke: node.fill || node.stroke || canvasColors.nodeStroke,
+                        textColor: node.textColor || canvasColors.nodeText,
                         normalizedPath: node.normalizedPath
                     });
                     el.set('nodeId', node.id);

@@ -100,6 +100,24 @@
             return '';
         }
 
+        // Extract fill color from shape element
+        function extractFillColor(shapeElement) {
+            const shape = shapeElement.querySelector('rect, ellipse, path');
+            return shape ? shape.getAttribute('fill') : null;
+        }
+
+        // Extract stroke color from shape element
+        function extractStrokeColor(shapeElement) {
+            const shape = shapeElement.querySelector('rect, ellipse, path');
+            return shape ? shape.getAttribute('stroke') : null;
+        }
+
+        // Extract text/font color from node group
+        function extractTextColor(group) {
+            const text = group.querySelector('text');
+            return text ? text.getAttribute('fill') : null;
+        }
+
         // Extract path data from a shape element
         function extractPathData(shapeElement) {
             const paths = shapeElement.querySelectorAll('path');
@@ -575,7 +593,10 @@
                                 label: extractLabel(g),
                                 shapeType: shapeType,
                                 pathData: pathData,
-                                normalizedPath: normalizedPath
+                                normalizedPath: normalizedPath,
+                                fill: extractFillColor(shape),
+                                stroke: extractStrokeColor(shape),
+                                textColor: extractTextColor(g)
                             });
                         }
                         break;
@@ -621,9 +642,9 @@
                     width: node.width,
                     height: node.height,
                     label: node.label,
-                    fill: canvasColors.nodeFill,
-                    stroke: canvasColors.nodeStroke,
-                    textColor: canvasColors.nodeText,
+                    fill: node.fill || canvasColors.nodeFill,
+                    stroke: node.fill || node.stroke || canvasColors.nodeStroke,
+                    textColor: node.textColor || canvasColors.nodeText,
                     normalizedPath: node.normalizedPath
                 });
 
