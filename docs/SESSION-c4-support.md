@@ -287,25 +287,45 @@ make build
 
 ## Current Status
 
-### Completed
+### Completed (All Released)
+
+**v1.4.0 - C4 Support**
 - [x] Research D2's C4 model support
 - [x] Analyze SVG output for c4-person shape
 - [x] Document detection patterns
 - [x] Create example C4 diagrams
-- [x] Add --c4 flag to CLI (uncommitted)
+- [x] Add --c4 flag to CLI
+- [x] Phase 1: Fix detectShapeType() for c4-person vs cylinder (H command check)
+- [x] Phase 1b: Add c4-person shape to ShapeRegistry
+- [x] Sync to export.html
+- [x] Fix hexagon detection (lineCount === 5)
+
+**v1.5.0 - Path Extraction**
+- [x] Phase 2: Extract path data in parseD2Svg()
+- [x] Phase 3: Create normalizePath/translatePath/scalePath utilities
+- [x] Phase 4: Update ShapeRegistry to use extracted paths from D2
+- [x] Exact visual fidelity between D2 output and JointJS canvas
+
+**v1.6.0 - Color Extraction**
+- [x] Extract fill color from D2 SVG
+- [x] Extract stroke color from D2 SVG
+- [x] Extract text color from D2 SVG
+- [x] Apply colors to JointJS shapes
+- [x] Stroke matches fill for seamless multi-path shapes
+
+**v1.7.0 - Font Color & Edge Labels**
+- [x] Fix CSS overriding text color (removed `fill: #000000` from `.joint-element text`)
+- [x] Font colors from D2 source now apply correctly to JointJS shapes
+- [x] Add edge label extraction from D2 SVG
+- [x] Render edge labels on JointJS links with proper positioning
+- [x] Sync all changes to export.html for CLI consistency
 
 ### Pending
-- [x] Phase 1: Fix detectShapeType() for c4-person vs cylinder
-- [x] Phase 1b: Add c4-person shape to ShapeRegistry (basic implementation)
-- [x] Phase 1c: Sync detectShapeType fix and c4-person to export.html
-- [ ] Phase 2: Extract path data in parseD2Svg()
-- [ ] Phase 3: Create normalizePath() utility
-- [ ] Phase 4: Update ShapeRegistry to use extracted paths from D2
-- [ ] Test all shapes still work
-- [ ] Commit changes
+- [ ] Consider creating a proper C4 theme with official C4 colors
 
 ## Notes
 
-- The hexagon fix (lineCount === 5 instead of 6) is also uncommitted on this branch
-- CLAUDE.md has documentation updates that should be committed separately
-- Consider creating a proper C4 theme with official C4 colors in the future
+- All C4 core functionality is complete and released
+- Font colors from D2 source (e.g., `style.font-color: white`) now render correctly
+- Edge labels are displayed at 50% position on links with white background
+- Path extraction ensures visual fidelity with D2 output

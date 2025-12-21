@@ -221,14 +221,8 @@
             padding: 2px 8px;
             font-size: 11px;
         }
-        /* JointJS element styling */
-        .joint-element .body {
-            fill: #3c3c3c;
-            stroke: #888;
-            stroke-width: 1;
-        }
+        /* JointJS element styling - fill/stroke set by shape attrs, not CSS */
         .joint-element text {
-            fill: #000000;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
         .joint-link .connection {
@@ -912,7 +906,6 @@
                                 stroke: extractStrokeColor(shape),
                                 textColor: extractTextColor(g)
                             });
-                            console.log('Found node:', decoded, shapeType, 'fill:', extractFillColor(shape));
                         }
                         break;
                     }
@@ -922,11 +915,16 @@
                     if (path && decoded.includes('(') && /\)\[\d+\]$/.test(decoded)) {
                         const parsed = parseEdgeId(decoded);
                         if (parsed) {
+                            // Extract edge label from text element
+                            const textEl = g.querySelector('text');
+                            const label = textEl ? textEl.textContent : '';
+
                             edges.push({
                                 id: decoded,
                                 source: parsed.source,
                                 target: parsed.target,
-                                direction: parsed.direction
+                                direction: parsed.direction,
+                                label: label
                             });
                         }
                         break;
@@ -1265,6 +1263,24 @@
                 link.set('edgeId', edge.id);
                 jointLinks[edge.id] = link;
 
+                // Add edge label if present
+                if (edge.label) {
+                    link.appendLabel({
+                        attrs: {
+                            text: {
+                                text: edge.label,
+                                fill: canvasColors.nodeText,
+                                fontSize: 14
+                            },
+                            rect: {
+                                fill: canvasColors.background,
+                                stroke: 'none'
+                            }
+                        },
+                        position: { distance: 0.5 }
+                    });
+                }
+
                 // Apply stored vertices if any
                 const storedVertices = edgeVertices[edge.id];
                 if (storedVertices && storedVertices.length > 0) {
@@ -1577,6 +1593,24 @@
                     link.set('edgeId', edge.id);
                     jointLinks[edge.id] = link;
 
+                    // Add edge label if present
+                    if (edge.label) {
+                        link.appendLabel({
+                            attrs: {
+                                text: {
+                                    text: edge.label,
+                                    fill: canvasColors.nodeText,
+                                    fontSize: 14
+                                },
+                                rect: {
+                                    fill: canvasColors.background,
+                                    stroke: 'none'
+                                }
+                            },
+                            position: { distance: 0.5 }
+                        });
+                    }
+
                     // Apply stored vertices if any
                     const storedVertices = edgeVertices[edge.id];
                     if (storedVertices && storedVertices.length > 0) {
@@ -1695,7 +1729,7 @@
             const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
             style.textContent = `
                 .joint-element .body { fill: ${canvasColors.nodeFill}; stroke: ${canvasColors.nodeStroke}; stroke-width: 1; }
-                .joint-element text { fill: ${canvasColors.nodeText}; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; }
+                .joint-element text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; }
                 .joint-link .connection { stroke: ${canvasColors.linkStroke}; stroke-width: 2; fill: none; }
                 .joint-link .connection-wrap { fill: none; stroke: transparent; stroke-width: 20; }
                 .joint-link .marker-target, .joint-link .marker-source { fill: ${canvasColors.linkStroke}; }

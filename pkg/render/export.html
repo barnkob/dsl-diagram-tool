@@ -608,11 +608,16 @@
                         if (parsed) {
                             // Use HTML-decoded ID to match metadata keys
                             const htmlDecodedId = decodeHtmlEntities(decoded);
+                            // Extract edge label from text element
+                            const textEl = g.querySelector('text');
+                            const label = textEl ? textEl.textContent : '';
+
                             edges.push({
                                 id: htmlDecodedId,
                                 source: parsed.source,
                                 target: parsed.target,
-                                direction: parsed.direction
+                                direction: parsed.direction,
+                                label: label
                             });
                         }
                         break;
@@ -694,6 +699,24 @@
                     link.attr('line/targetMarker', null);
                 }
 
+                // Add edge label if present
+                if (edge.label) {
+                    link.appendLabel({
+                        attrs: {
+                            text: {
+                                text: edge.label,
+                                fill: canvasColors.nodeText,
+                                fontSize: 14
+                            },
+                            rect: {
+                                fill: canvasColors.background,
+                                stroke: 'none'
+                            }
+                        },
+                        position: { distance: 0.5 }
+                    });
+                }
+
                 link.set('edgeId', edge.id);
                 jointLinks[edge.id] = link;
 
@@ -728,7 +751,7 @@
             const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
             style.textContent = `
                 .joint-element .body { fill: ${canvasColors.nodeFill}; stroke: ${canvasColors.nodeStroke}; stroke-width: 1; }
-                .joint-element text { fill: ${canvasColors.nodeText}; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; }
+                .joint-element text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; }
                 .joint-link .connection { stroke: ${canvasColors.linkStroke}; stroke-width: 2; fill: none; }
                 .joint-link .connection-wrap { fill: none; stroke: transparent; stroke-width: 20; }
                 .joint-link .marker-target, .joint-link .marker-source { fill: ${canvasColors.linkStroke}; }
