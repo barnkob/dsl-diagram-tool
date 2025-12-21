@@ -1234,8 +1234,16 @@
             jointElements = {};
             jointLinks = {};
 
+            // Sort nodes by hierarchy level (containers first, then children)
+            // Fewer dots in ID = higher in hierarchy = render first (behind children)
+            const sortedNodes = [...nodes].sort((a, b) => {
+                const aDepth = (a.id.match(/\./g) || []).length;
+                const bDepth = (b.id.match(/\./g) || []).length;
+                return aDepth - bDepth;
+            });
+
             // Create nodes
-            for (const node of nodes) {
+            for (const node of sortedNodes) {
                 // Apply stored position offset if any
                 const offset = nodePositions[node.id] || { dx: 0, dy: 0 };
                 const x = node.x + offset.dx;
@@ -1537,8 +1545,15 @@
                 }
             }
 
+            // Sort nodes by hierarchy level (containers first, then children)
+            const sortedNewNodes = [...newNodes].sort((a, b) => {
+                const aDepth = (a.id.match(/\./g) || []).length;
+                const bDepth = (b.id.match(/\./g) || []).length;
+                return aDepth - bDepth;
+            });
+
             // Process nodes
-            for (const node of newNodes) {
+            for (const node of sortedNewNodes) {
                 if (jointElements[node.id]) {
                     // Update existing node
                     const el = jointElements[node.id];
