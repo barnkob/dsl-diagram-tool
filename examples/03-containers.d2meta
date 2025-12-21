@@ -14,22 +14,28 @@
       "dy": 3
     },
     "aws.vpc.private.webserver1": {
-      "dx": 163,
-      "dy": 29
+      "dx": -7,
+      "dy": -11
     },
     "aws.vpc.private.webserver2": {
-      "dx": 356,
-      "dy": 39
+      "dx": 16,
+      "dy": -1
     }
   },
   "vertices": {
     "aws.vpc.private.(webserver1 -\u003e database.primary)[0]": [
       {
-        "x": 90,
-        "y": 780
+        "x": 148.5,
+        "y": 700
       },
       {
         "x": 90,
+        "y": 899
+      }
+    ],
+    "aws.vpc.private.(webserver2 -\u003e database.primary)[0]": [
+      {
+        "x": 368.5,
         "y": 899
       }
     ]
