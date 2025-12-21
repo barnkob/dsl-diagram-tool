@@ -1,12 +1,23 @@
 # Session: C4 Model Support
 
 **Date:** 2025-12-21
-**Branch:** wp-hexagon-fix
-**Status:** Planning complete, implementation pending
+**Latest Release:** v1.7.0 (merged to main)
+**Status:** Complete - all core C4 features implemented
 
 ## Goal
 
 Add full C4 diagram support to the browser editor, using D2's native C4 features. Users should be able to create C4 diagrams with proper shapes and styling, and manipulate them interactively in the JointJS canvas.
+
+## Quick Start (Next Session)
+
+```bash
+# View current state
+git log --oneline -5
+cat docs/SESSION-c4-support.md | grep -A 10 "Pending"
+
+# Pick a feature from Pending list and create branch
+git checkout -b wp-<feature-name>
+```
 
 ## Background Research
 
