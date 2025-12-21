@@ -708,20 +708,24 @@
         ShapeRegistry.register('person', (opts) => {
             const w = opts.width;
             const h = opts.height;
-            // C4 person: circular head on top of rounded rectangle body
-            // Head is 25% of height, body is 60% of width centered
-            const headRadius = Math.min(w * 0.30, h * 0.125);
+            // Proportions derived from user SVG design:
+            // - Head: 27.8% of height (radius = 13.9%)
+            // - Gap between head and body: 3.7% of height
+            // - Body: full width, 68.5% of height
+            // - Corner radius: 8.3% of body height
+            const headRadius = h * 0.139;
             const headCX = w / 2;
             const headCY = headRadius;
-            const bodyTop = headRadius * 2 - 2; // Overlap slightly with head for connected look
-            const bodyLeft = w * 0.20;
-            const bodyRight = w * 0.80;
+            const gap = h * 0.037;
+            const bodyTop = headRadius * 2 + gap;
+            const bodyLeft = 0;
+            const bodyRight = w;
             const bodyBottom = h;
-            const cornerRadius = 6;
+            const bodyHeight = bodyBottom - bodyTop;
+            const cornerRadius = bodyHeight * 0.083;
 
-            // Calculate body center for label positioning (as fraction of total height)
+            // Calculate body center for label positioning
             const bodyCenterY = (bodyTop + bodyBottom) / 2;
-            const labelRefY = bodyCenterY / h;
 
             // Head circle + body rounded rectangle
             const d = `
@@ -750,7 +754,7 @@
                         strokeWidth: 1,
                         d: d
                     },
-                    label: { text: opts.label, fill: opts.textColor, fontSize: 14, refX: 0.5, refY: labelRefY, textAnchor: 'middle', textVerticalAnchor: 'middle' }
+                    label: { text: opts.label, fill: opts.textColor, fontSize: 14, x: w / 2, y: bodyCenterY, textAnchor: 'middle', textVerticalAnchor: 'middle' }
                 }
             });
         });

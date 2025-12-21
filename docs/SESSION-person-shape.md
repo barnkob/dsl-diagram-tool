@@ -2,62 +2,48 @@
 
 **Date:** 2025-12-21
 **Branch:** wp-shape-support
-**Status:** Waiting for user SVG input
+**Status:** Complete
 
-## Context
+## Summary
 
-Working on improving the person shape in the JointJS browser editor. The shape consists of:
-- A circle for the head
-- A rounded rectangle for the body
-- Label text centered in the body
+Updated person shape proportions based on user-provided SVG design (`/Users/mark/storagebox/mark/person.svg`).
 
-## Current State
+## Proportions Applied
 
-The person shape proportions have been adjusted but need further refinement. Current settings:
-- Head: 25% of height (radius = `h * 0.125`)
-- Body: 60% of width, centered (from 20% to 80%)
-- Label: Centered vertically in the body rectangle
+From the user's Inkscape SVG:
+- **Head radius:** 13.9% of total height
+- **Gap (head→body):** 3.7% of total height
+- **Body width:** 100% (full width)
+- **Body height:** 68.5% of total height
+- **Corner radius:** 8.3% of body height
 
-## Next Step
-
-User will create an SVG file with the desired person shape proportions:
-- A circle for the head
-- A rectangle for the body
-
-Once the SVG is provided, extract the coordinates and calculate:
-1. Head radius as percentage of total height
-2. Body width as percentage of total width
-3. Body top position relative to head
-4. Any gap/overlap between head and body
-
-## Files to Update
-
-Both files must stay in sync:
-- `pkg/server/web/dist/index.html` - Browser editor (lines ~707-756)
-- `pkg/render/export.html` - CLI export template (lines ~232-281)
-
-## Current Person Shape Code
+## Final Code
 
 ```javascript
 // In ShapeRegistry.register('person', ...)
-const headRadius = Math.min(w * 0.30, h * 0.125);
+const headRadius = h * 0.139;
 const headCX = w / 2;
 const headCY = headRadius;
-const bodyTop = headRadius * 2 - 2; // Overlap slightly with head
-const bodyLeft = w * 0.20;
-const bodyRight = w * 0.80;
+const gap = h * 0.037;
+const bodyTop = headRadius * 2 + gap;
+const bodyLeft = 0;
+const bodyRight = w;
 const bodyBottom = h;
-const cornerRadius = 6;
+const bodyHeight = bodyBottom - bodyTop;
+const cornerRadius = bodyHeight * 0.083;
 
-// Label positioned at vertical center of body
+// Label positioned at center of body (absolute positioning)
 const bodyCenterY = (bodyTop + bodyBottom) / 2;
-const labelRefY = bodyCenterY / h;
+// ...
+label: { x: w / 2, y: bodyCenterY, textAnchor: 'middle', textVerticalAnchor: 'middle' }
 ```
 
-## To Continue
+## Files Updated
 
-1. User provides SVG file path with person shape design
-2. Read SVG and extract circle (head) and rect (body) coordinates
-3. Calculate proportions relative to overall bounding box
-4. Update both index.html and export.html
-5. Test with: `./bin/diagtool serve examples/02-shape-types.d2`
+- `pkg/server/web/dist/index.html` - Browser editor
+- `pkg/render/export.html` - CLI export template
+
+## Notes
+
+- Changed from `refX`/`refY` to absolute `x`/`y` for label positioning (refX/refY didn't work correctly with custom Path shapes)
+- Both files kept in sync with identical person shape code
