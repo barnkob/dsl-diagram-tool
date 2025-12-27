@@ -46,21 +46,19 @@ examples/           - Example diagrams
 
 ## Development Workflow
 
-### Working on a Work Package
+### Working on Tasks
 
-Each work package (WP) is a focused development effort. Before starting:
-
-1. Read the work package description in `Projects/DSL-Diagram-Tool.md`
-2. Check dependencies (some WPs depend on previous ones)
-3. Create feature branch: `git checkout -b wp##-name`
+1. Check `docs/TASKS.md` for current and backlog items
+2. Move a task to "Current" when starting work
+3. Create feature branch: `git checkout -b feat/short-description` or `fix/issue-name`
 4. Implement functionality with tests
-5. Update documentation
-6. Commit changes: `git commit -m "Complete WP##: description"`
-7. Mark work package complete in project file
+5. Update documentation if needed
+6. Commit changes with conventional commit format
+7. Move task to "Done" when complete
 
 **Git Workflow:**
-- Main branch: `main` (stable, completed work packages)
-- Feature branches: `wp##-name` for each work package
+- Main branch: `main` (stable)
+- Feature branches: `feat/short-description` or `fix/issue-name`
 - Commit frequently with descriptive messages
 - Use conventional commit format: `feat:`, `fix:`, `docs:`, `test:`, etc.
 
@@ -290,13 +288,10 @@ go test -v -run TestSpecificTest ./pkg/parser/
 
 ## Next Steps
 
-After WP01, the next work packages are:
-- **WP02**: D2 syntax research - Study D2 language features
-- **WP03**: IR design - Define internal data structures
-- **WP04**: D2 integration - Wrap D2 library with our abstractions
+See `docs/TASKS.md` for current work and backlog.
 
-See `Projects/DSL-Diagram-Tool.md` for complete roadmap.
+See `docs/DECISIONS.md` for architectural context.
 
 ---
 
-**Questions or Issues?** Document them in the project file's Notes section.
+**Questions or Issues?** Document decisions in `docs/DECISIONS.md`.

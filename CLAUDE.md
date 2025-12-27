@@ -58,14 +58,19 @@ D2 Source (.d2) → D2 Library → SVG → Browser Editor (JointJS) → User Int
 
 ## Git Workflow
 
-Branch naming: `wp##-short-name` (work packages)
+Branch naming:
+- `feat/short-description` for features
+- `fix/issue-name` for bug fixes
 
 Conventional commits: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`
 
-Merge to main when complete:
-```bash
-git checkout main && git merge wp##-short-name
-```
+## Workflow
+
+- Check `docs/TASKS.md` for current work
+- Update TASKS.md when completing items
+- Keep commits focused and atomic
+- Ask before making significant architectural changes
+- See `docs/DECISIONS.md` for architectural context
 
 ## Browser Editor (JointJS)
 
